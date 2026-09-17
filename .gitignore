@@ -1,0 +1,20 @@
+# Secrets -- never commit real values (see .env.example for the template)
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Local SQLite dev database
+*.db
+*.db-journal
+
+# OS / editor noise
+.DS_Store
+Thumbs.db

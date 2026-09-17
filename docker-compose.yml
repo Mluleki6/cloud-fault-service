@@ -1,0 +1,36 @@
+# Local distributed stack -- maps to the managed cloud equivalent noted
+# in each service's comment, per the handbook's Option D mapping table.
+
+services:
+  db:
+    # Local equivalent of Cloud SQL (Postgres) / RDS.
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: faultservice
+      POSTGRES_PASSWORD: changeme
+      POSTGRES_DB: faultservice
+    ports:
+      - "5432:5432"
+    volumes:
+      - fault_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U faultservice"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    # Local equivalent of a Cloud Run function / service.
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: postgresql://faultservice:changeme@db:5432/faultservice
+      NOTIFY_FORCE_FAILURE: "${NOTIFY_FORCE_FAILURE:-0}"
+      DB_FORCE_FAILURE: "${DB_FORCE_FAILURE:-0}"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  fault_db_data:

@@ -1,0 +1,39 @@
+{
+  "event": "FaultReport",
+  "description": "A report submitted when a piece of equipment or a facility is found faulty.",
+  "request_example": {
+    "equipment_id": "LAB-014",
+    "location": "Science Building, Room 214",
+    "description": "Projector will not power on.",
+    "severity": "high",
+    "reporter_id": "STU-2026-001"
+  },
+  "request_fields": {
+    "equipment_id": {"type": "string", "required": true, "rule": "3-32 chars, letters/digits/hyphen only, normalised to uppercase"},
+    "location": {"type": "string", "required": true, "rule": "2-120 chars"},
+    "description": {"type": "string", "required": true, "rule": "5-500 chars"},
+    "severity": {"type": "enum", "required": true, "values": ["low", "medium", "high"]},
+    "reporter_id": {"type": "string", "required": true, "rule": "3-32 chars, synthetic ID only -- no real personal data"}
+  },
+  "success_response_example": {
+    "ticket_id": "FR-9F3A21B0",
+    "correlation_id": "b6f0b6a2-...",
+    "equipment_id": "LAB-014",
+    "location": "Science Building, Room 214",
+    "description": "Projector will not power on.",
+    "severity": "high",
+    "priority": "P1",
+    "status": "open",
+    "reporter_id": "STU-2026-001",
+    "created_at": "2026-08-28T14:00:00Z",
+    "notified": true
+  },
+  "error_response_example": {
+    "error": "invalid_request",
+    "detail": "One or more fields failed validation.",
+    "correlation_id": "b6f0b6a2-...",
+    "errors": [{"loc": ["severity"], "msg": "Input should be...", "type": "enum"}]
+  },
+  "processing_rule": "severity -> priority: high=P1, medium=P2, low=P3",
+  "idempotency_note": "Each submission creates a new ticket_id; duplicate-detection by content is out of scope for the MVP and is listed as a limitation in the report."
+}

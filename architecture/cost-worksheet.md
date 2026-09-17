@@ -1,5 +1,15 @@
 # Cost Worksheet — Fault Reporting Service
 
+> **Actual outcome (2026-09-17):** GCP billing verification did not clear
+> in time and the billing account was unlinked before any resource was
+> created — confirmed no Cloud SQL instance, no Cloud Run service, both
+> required APIs left disabled throughout. **Actual cloud spend: $0.** The
+> team proceeded on the Docker Compose stack per
+> [decisions/0001-platform-and-stack.md](decisions/0001-platform-and-stack.md#update--2026-09-17).
+> The estimate below is kept as the planning analysis that informed the
+> teardown-discipline decisions in that ADR, not as a claim that these
+> resources were actually run.
+
 Estimated GCP cost for the primary deployment target (Cloud Run + Cloud SQL
 + Cloud Logging), scoped to the actual workload: a short-lived course
 prototype exercised only during milestone evidence capture, not a

@@ -1,5 +1,12 @@
 # 0001 — Platform and Application Stack
 
+## Status
+**Amended 2026-09-17** — see [Update](#update--2026-09-17) below. The team
+is proceeding on Docker Compose only; the original GCP-primary decision
+below is kept for the record, not because it changed our assessment of
+GCP as a platform, but because it's what was actually decided and why,
+which is what an ADR is for.
+
 ## Decision
 Use Python (FastAPI) for the application, Postgres for persistence, and
 target Google Cloud (Cloud Run + Cloud SQL + Cloud Logging) as the
@@ -58,3 +65,28 @@ target; only `DATABASE_URL` and the deployment command change.
 - Local stack: `docker-compose.yml`.
 - Cloud provisioning (one-time): `scripts/provision_gcp.sh`.
 - Cloud deploy path (repeatable): `scripts/deploy_gcp.sh`.
+
+## Update — 2026-09-17
+GCP billing setup was attempted (project `project-a12689f2-b066-4b7a-812`
+created, `gcloud` CLI authenticated) but the free-trial payment
+verification did not clear, and the billing account was subsequently
+unlinked from the project before any GCP resource was created — no
+Cloud Run service, Cloud SQL instance, or other billable resource was
+ever provisioned; both required APIs remained disabled throughout.
+
+Per the "Consequences" clause above, and because we do not want a
+pending third-party billing verification blocking milestone delivery,
+**the team is proceeding on the Docker Compose stack alone** for
+Milestone 3 and Milestone 4, rather than continuing to wait on GCP
+account approval. This is not a rejection of Google Cloud as a target —
+`scripts/provision_gcp.sh` and `scripts/deploy_gcp.sh` remain ready to
+run unmodified if billing is resolved later — it is a schedule decision
+given the hard milestone gates.
+
+**Consequence for the report:** state explicitly that the local Docker
+Compose environment is the delivered environment, with Cloud Run/Cloud
+SQL/Cloud Logging documented as the intended managed-cloud mapping (see
+the "Cloud role" table in the README and the "Managed cloud equivalent"
+notes in `docker-compose.yml`) rather than as resources actually
+demonstrated running in GCP. This is exactly the documented Option D
+fallback path, invoked as anticipated.

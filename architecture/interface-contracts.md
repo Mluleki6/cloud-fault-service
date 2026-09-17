@@ -14,6 +14,26 @@ Milestone 2 requirement for documented interface contracts.
 - No endpoint mutates a ticket after creation (explicit Milestone 1
   exclusion — no status-update endpoint exists).
 
+## §5.3 template — per interface
+
+The handbook's interface contract template (§5.3) asks for eight fields per
+interface. Full detail on each is in the sections below; this table is the
+compact, template-exact form for quick marking reference. `Owner` names the
+role from [milestone3-integration-plan.md](milestone3-integration-plan.md)
+that owns this code path — the actual team member is still TBC pending the
+team's role-allocation meeting.
+
+| Field | `POST /faults` | `GET /faults/{ticket_id}` | `GET /health` |
+|---|---|---|---|
+| **Name** | SubmitFaultReport | RetrieveFaultReport | HealthCheck |
+| **Trigger/endpoint** | `POST /faults` | `GET /faults/{ticket_id}` | `GET /health` |
+| **Input** | JSON body: `equipment_id`, `location`, `description`, `severity`, `reporter_id` (all required — see [event-contract.json](event-contract.json)) | Path param `ticket_id` (string) | None |
+| **Validation** | Pydantic schema: type, length bounds, `severity` enum, `equipment_id` format regex, normalised to uppercase | None beyond string path parsing — invalid/unknown IDs are a 404, not a validation error | None |
+| **Success output** | `201`, `FaultReportOut` body incl. `ticket_id`, `correlation_id`, derived `priority`, `notified` flag | `200`, same `FaultReportOut` shape as the original submission | `200`, `{"status":"ok"}` |
+| **Failure output** | `400 invalid_request` (bad input, no ticket created); `503 dependency_unavailable` (DB down, no ticket created) — both carry `correlation_id` | `404 not_found`, carries `correlation_id` | None defined — process responding at all implies `200` |
+| **Idempotency** | **Not idempotent.** Every valid submission creates a new `ticket_id`, even if the payload is identical to a prior request. Duplicate-submission detection is an explicit out-of-scope exclusion (Milestone 1 §2, `event-contract.json`'s `idempotency_note`) | Idempotent — read-only, same ticket returned for repeated calls with the same ID | Idempotent — stateless liveness check |
+| **Owner** | Function/application developer (member: TBC) | Data & observability lead (member: TBC) | Cloud platform & security lead (member: TBC) |
+
 ## GET /health
 
 Liveness probe. Used by orchestrators (Docker healthcheck, Cloud Run

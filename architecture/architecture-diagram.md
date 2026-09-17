@@ -42,6 +42,11 @@ flowchart TB
 
 ## Annotations
 
+Quick-reference notes per component (expanded into the full §5.2 annotation
+chain — requirement → service role → trust boundary → input/output →
+failure behaviour → permission → cost unit → evidence source — in the
+table below):
+
 | Element | Role | Notes |
 |---|---|---|
 | Reporter | Event source, outside trust boundary | No authentication (explicit Milestone 1 exclusion) — anyone who can reach the endpoint can submit. Accepted risk for a course prototype; see [threat-checklist.md](threat-checklist.md). |
@@ -52,6 +57,17 @@ flowchart TB
 | Persistence | Durable system of record | Postgres locally / in Docker, Cloud SQL when deployed — same SQLAlchemy models, only `DATABASE_URL` changes. This is the system of record, not a disposable cache — satisfies the Milestone 1 architecture note that persistent state "is not hidden inside a replaceable function." |
 | Notification | Best-effort, explicitly non-blocking | A failure here is caught, logged, and does **not** fail the request or corrupt the persisted ticket — satisfies **Q3**'s "safe error, not corrupted state" for this dependency. |
 | Structured log | Cross-cutting, every path | Every accepted/rejected/failed event writes one JSON line carrying `correlation_id`, satisfying **Q4**. In Cloud Run this stream is auto-ingested by Cloud Logging with zero extra wiring. |
+
+## Full component annotation (§5.2 required chain)
+
+| Component | Requirement | Service role | Trust boundary | Input / output | Failure behaviour | Permission | Cost unit | Evidence source |
+|---|---|---|---|---|---|---|---|---|
+| API endpoint | F1, F2 | HTTP entry point (FastAPI/uvicorn; maps to Cloud Run) | Inside — first component a request touches | In: raw HTTP JSON. Out: `FaultReportOut` or a typed error body | Malformed/invalid body → `400`, own error shape (see [failure-table.md](failure-table.md) row 3–5) | None (`--allow-unauthenticated`) — explicit product exclusion, not oversight; see [threat-checklist.md](threat-checklist.md) | Cloud Run: per-request CPU/memory time, free tier covers this workload (see [cost-worksheet.md](cost-worksheet.md)) | `app/main.py`; [interface-contracts.md](interface-contracts.md) |
+| Validation | F2 | Pydantic schema enforcement | Inside | In: parsed dict. Out: typed `FaultReportIn` or `ValidationError` | Bad field → `400` before any processing/persistence runs, no state created | N/A (in-process, no external identity) | $0 (in-process compute only, covered by API endpoint's cost unit) | `app/schemas.py`; [failure-table.md](failure-table.md) rows 3–4 |
+| Processing | F3 | Business rule: severity → priority | Inside | In: validated report. Out: `ticket_id`, `priority` | N/A — pure function, cannot fail on valid input | N/A (in-process) | $0 (in-process compute) | `app/processing.py` |
+| Persistence | F4, Q3 | Durable system of record (Postgres / Cloud SQL) | Inside | In: `Ticket` row. Out: same row on retrieval | DB unreachable → `503`, no partial write (see [failure-table.md](failure-table.md) row 1) | Runner service account granted `roles/cloudsql.client` only (least privilege; see `scripts/provision_gcp.sh`) | Cloud SQL instance-hours + storage — the dominant cost line, see [cost-worksheet.md](cost-worksheet.md) | `app/persistence.py`; `evidence/milestone3_evidence.md` §E1, E6 |
+| Notification | Q3 | Best-effort maintenance alert (stub today) | Inside (call originates here) / crosses to outside once real | In: `ticket_id`, `equipment_id`, `priority`. Out: `bool` success, or caught `NotificationError` | Failure caught and logged, never blocks or fails the request (see [failure-table.md](failure-table.md) row 2) | N/A today (no external call made); once real, would need a scoped API key/webhook secret via Secret Manager | $0 today (stub); real channel's cost is external (email API tier / self-hosted n8n) | `app/notify.py`; `evidence/milestone3_evidence.md` §E7 |
+| Structured log | Q4 | Cross-cutting observability | Inside | In: event name + fields. Out: one JSON line to stdout | N/A — logging itself is not a modelled failure point | Runner service account granted `roles/logging.logWriter` | Cloud Logging: free up to 50GiB/project/month, this workload is well under it | `app/logging_utils.py`; every row in `evidence/milestone3_evidence.md` |
 
 ## Trust boundary statement
 

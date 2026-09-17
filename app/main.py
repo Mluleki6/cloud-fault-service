@@ -14,7 +14,8 @@ import os
 import uuid
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
@@ -32,6 +33,36 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Fault Reporting Service", version="0.1.0", lifespan=lifespan)
+
+
+@app.exception_handler(RequestValidationError)
+async def malformed_request_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    # Catches bodies that fail before FaultReportIn validation even runs --
+    # not valid JSON, or valid JSON that isn't an object (e.g. a bare
+    # string or array). Without this, FastAPI's default handler returns a
+    # differently-shaped error with no correlation_id, breaking the same
+    # error contract documented in architecture/event-contract.json and
+    # skipping the structured log Q4 requires for every rejected event.
+    correlation_id = str(uuid.uuid4())
+    safe_errors = [
+        {"loc": list(e.get("loc", [])), "msg": e.get("msg"), "type": e.get("type")}
+        for e in exc.errors()
+    ]
+    log_event(
+        "fault_report.rejected",
+        correlation_id,
+        reason="malformed_request",
+        errors=safe_errors,
+    )
+    return JSONResponse(
+        status_code=400,
+        content={
+            "error": "invalid_request",
+            "detail": "The request body is missing or is not valid JSON.",
+            "correlation_id": correlation_id,
+            "errors": safe_errors,
+        },
+    )
 
 
 @app.get("/health")

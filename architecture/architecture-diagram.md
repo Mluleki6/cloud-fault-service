@@ -5,6 +5,9 @@ Annotated version of the Milestone 1 "Figure 1". Rendered with Mermaid
 LMS Word/PDF submission, paste this block into the
 [Mermaid Live Editor](https://mermaid.live) and export a PNG/SVG).
 
+A rendered PNG with numbered arrows that match the Milestone 2 event-flow
+table is in [diagrams/event-flow.png](diagrams/event-flow.png).
+
 ```mermaid
 flowchart TB
     subgraph EXT["Outside the trust boundary"]

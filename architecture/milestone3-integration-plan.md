@@ -14,25 +14,18 @@ reproduce it. That reframes the plan below.
 
 ## Role allocation
 
-> **Status: still TBC.** Milestone 1's team charter listed all five roles
-> as "confirm at first meeting," and that meeting has not yet happened.
-> This section cannot honestly assign real names — that is a team decision,
-> not a technical one. What follows is the role definition from the
-> handbook (§3.1) mapped onto the concrete tasks that role owns for this
-> specific codebase, ready to be claimed at the team's next meeting.
+Roles are carried forward unchanged from the Milestone 1 team charter.
 
-| Role | What exists already for this role to own | What's still open |
-|---|---|---|
-| **Architecture & integration lead** | `architecture/architecture-diagram.md`, interface contracts, ADR | Own the Milestone 3 integration trace (E1–E6 below) and keep the diagram in sync with any changes |
-| **Cloud platform & security lead** | `docker-compose.yml`, `scripts/provision_gcp.sh`/`deploy_gcp.sh`, `.gitignore`, threat checklist | Decide whether to keep pursuing GCP or confirm the Docker Compose fallback as final (see ADR §Update); own the resource-inventory/teardown discipline |
-| **Function/application developer** | `app/schemas.py`, `app/processing.py`, `app/main.py` (validation, priority rule, endpoints) | Review the malformed-request fix, extend tests if the team wants more edge cases covered |
-| **Data & observability lead** | `app/persistence.py`, `app/logging_utils.py`, `evidence/milestone3_evidence.md` | Own the correlation-ID trace demonstration (E3 below) and the evidence pack's accuracy |
-| **QA, cost & documentation lead** | `tests/`, `architecture/cost-worksheet.md`, `README.md`, `scripts/smoke_test.sh` | Run the reproduction step (E6 below) as the "second member," own the report draft for Milestone 4 |
+| Role | Member | What exists already for this role to own | What's still open |
+|---|---|---|---|
+| **Architecture & Integration Lead** | Andiswa Ngcobo | `architecture/architecture-diagram.md`, interface contracts, ADR | Own the Milestone 3 integration trace and keep the diagram in sync with any changes |
+| **Cloud Platform & Security Lead** | Mluleki Nkosinathi Mzelemu | `docker-compose.yml`, `scripts/provision_gcp.sh`/`deploy_gcp.sh`, `.gitignore`, threat checklist | Confirm Docker Compose as the final platform (see ADR update); own resource inventory and teardown |
+| **Function/Application Developer** | Sandile Luthuli | `app/schemas.py`, `app/processing.py`, `app/main.py` | Review the malformed-request fix; extend tests if more edge cases are wanted |
+| **Data & Observability Lead** | Mzameni Nkosi | `app/persistence.py`, `app/logging_utils.py`, `evidence/milestone3_evidence.md` | Own the correlation-ID trace demonstration and the evidence pack's accuracy |
+| **QA, Cost & Documentation Lead** | Andiswa Anele Xulu | `tests/`, `architecture/cost-worksheet.md`, `README.md`, `scripts/smoke_test.sh` | Run the reproduction step as the second member; own the Milestone 4 report draft |
 
-**Action for the team's next meeting:** each member picks one row. Whoever
-already has informal familiarity with a piece (e.g. if someone set up the
-original prototype) should say so, but per §3.2's "no role silos" rule,
-everyone still reviews at least one other member's area.
+Per the handbook's no-role-silos rule (§3.1), every member also reviews at
+least one other member's area and must be able to explain the whole system.
 
 ## Milestone 3 task plan (§6.2 required activities, mapped to owners)
 

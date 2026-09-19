@@ -20,8 +20,8 @@ The handbook's interface contract template (§5.3) asks for eight fields per
 interface. Full detail on each is in the sections below; this table is the
 compact, template-exact form for quick marking reference. `Owner` names the
 role from [milestone3-integration-plan.md](milestone3-integration-plan.md)
-that owns this code path — the actual team member is still TBC pending the
-team's role-allocation meeting.
+that owns this code path, with the member named in the Milestone 1 team
+charter.
 
 | Field | `POST /faults` | `GET /faults/{ticket_id}` | `GET /health` |
 |---|---|---|---|
@@ -32,7 +32,7 @@ team's role-allocation meeting.
 | **Success output** | `201`, `FaultReportOut` body incl. `ticket_id`, `correlation_id`, derived `priority`, `notified` flag | `200`, same `FaultReportOut` shape as the original submission | `200`, `{"status":"ok"}` |
 | **Failure output** | `400 invalid_request` (bad input, no ticket created); `503 dependency_unavailable` (DB down, no ticket created) — both carry `correlation_id` | `404 not_found`, carries `correlation_id` | None defined — process responding at all implies `200` |
 | **Idempotency** | **Not idempotent.** Every valid submission creates a new `ticket_id`, even if the payload is identical to a prior request. Duplicate-submission detection is an explicit out-of-scope exclusion (Milestone 1 §2, `event-contract.json`'s `idempotency_note`) | Idempotent — read-only, same ticket returned for repeated calls with the same ID | Idempotent — stateless liveness check |
-| **Owner** | Function/application developer (member: TBC) | Data & observability lead (member: TBC) | Cloud platform & security lead (member: TBC) |
+| **Owner** | Function/Application Developer — Sandile Luthuli | Data & Observability Lead — Mzameni Nkosi | Cloud Platform & Security Lead — Mluleki Nkosinathi Mzelemu |
 
 ## GET /health
 

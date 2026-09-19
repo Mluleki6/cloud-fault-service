@@ -45,7 +45,7 @@ continuously-running production service.
   across the whole module**, modulo a few cents of storage if a volume is
   left provisioned between sessions.
 - **Worst case** (Cloud SQL instance left running continuously for the
-  ~8-week module): roughly **$15–20 per calendar month** it's left up,
+  ~8-week module): roughly **$7–10 per calendar month** it's left up,
   dominated entirely by the Cloud SQL compute charge — Cloud Run and
   Logging stay within free tier at this workload regardless.
 

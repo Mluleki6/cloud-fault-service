@@ -28,7 +28,7 @@ Client  ->  GET /faults/{ticket_id}  ->  retrieve persisted ticket
 | API / function | FastAPI app in `app/`, run via Uvicorn | Cloud Run / Cloud Run functions |
 | Relational state | Postgres container (`docker-compose.yml`) | Cloud SQL (Postgres) |
 | Logging | Structured JSON to stdout (`app/logging_utils.py`) | Cloud Logging (auto-ingests stdout JSON) |
-| Notification | Stub in `app/notify.py` | n8n webhook or Resend/SendGrid API call |
+| Notification | `app/notify.py` -- real webhook if `NOTIFY_WEBHOOK_URL` is set, zero-dependency stub otherwise | n8n webhook, Discord/Slack webhook, or Resend/SendGrid API call |
 | Secrets | `.env` (never committed) | Secret Manager / Cloud Run env vars |
 
 Local dev also defaults to SQLite (zero setup) when `DATABASE_URL` is
@@ -186,11 +186,23 @@ originally, then add your result to `evidence/milestone3_evidence.md`:
    as a new entry in `architecture/decisions/` if it changes a prior
    decision, or as a note in `evidence/milestone3_evidence.md` either way.
 
+## Real notifications (optional)
+
+Set `NOTIFY_WEBHOOK_URL` (see `.env.example`) to have the notification
+step actually POST to a webhook instead of the zero-dependency stub.
+Any webhook receiver works -- the easiest zero-cost option is a
+Discord server webhook (Server Settings -> Integrations -> Webhooks ->
+New Webhook -> Copy URL), set alongside `NOTIFY_WEBHOOK_FORMAT=discord`.
+Leave `NOTIFY_WEBHOOK_URL` unset to keep the original stub behaviour.
+
+A failure of the real webhook still degrades exactly like the stub's
+simulated failure did: the ticket is persisted, `notified` comes back
+`false`, and the reason is logged (`fault_report.notify_failed`) --
+verified against a live endpoint returning both 2xx and 5xx responses.
+
 ## Known limitations (state these in the report, don't hide them)
 
 - No duplicate-submission detection (idempotency) beyond ticket-ID
   uniqueness — out of scope for the MVP.
-- Notification is a stub; wire it to a real n8n webhook or email API
-  before the final Milestone 4 demonstration.
 - No authentication/authorization layer yet — add before treating this
   as anything beyond a course prototype.

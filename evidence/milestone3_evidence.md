@@ -140,10 +140,41 @@ the ticket is still created and retrievable, just with `notified: false`.
 
 ## Known scope decisions (confirmed, not defects)
 
-- **Notifications** remain a stub (`app/notify.py`) by design for this
-  milestone — no external email/webhook account is required to run or grade
-  the slice. Swappable later for a real Resend/SendGrid call or n8n webhook.
+- **Notifications** support a real webhook (`NOTIFY_WEBHOOK_URL`, added
+  2026-09-30) with the original zero-dependency stub kept as the default
+  when it's unset — no external account is required to run or grade the
+  slice unless a real channel is deliberately configured. See "Real
+  notification channel evidence" below for the live-network verification.
 - **No authentication layer** — out of scope for a course prototype; would be
   needed before any real deployment.
 - **No duplicate-submission detection** — out of scope for the MVP beyond
   ticket-ID uniqueness.
+
+## Real notification channel evidence (2026-09-30)
+
+`app/notify.py` was extended so `NOTIFY_WEBHOOK_URL` (optional) makes a
+real outbound HTTP call instead of the no-op stub. Verified against the
+Docker stack after a full image rebuild (`docker compose up --build -d`),
+using a public echo endpoint so no real credentials are needed to prove
+the mechanism works:
+
+**Success** — `NOTIFY_WEBHOOK_URL=https://httpbin.org/post`:
+```
+POST /faults -> 201, "notified": true
+log: fault_report.accepted -> fault_report.notified -> fault_report.persisted
+```
+
+**Failure (real HTTP 500, not simulated)** — `NOTIFY_WEBHOOK_URL=https://httpbin.org/status/500`:
+```
+POST /faults -> 201, "notified": false  (ticket still persisted)
+log: fault_report.notify_failed, reason: "Webhook call failed: Server error
+     '500 INTERNAL SERVER ERROR' for url 'https://httpbin.org/status/500'"
+```
+
+This is a second, independent confirmation of the same degrade-gracefully
+property as `NOTIFY_FORCE_FAILURE` (§E7 above) — this time against a real
+network failure rather than a simulated one. 22/22 tests pass, including
+5 new unit tests in `tests/test_notify.py` covering the stub default,
+successful webhook post, Discord payload formatting, and both failure
+modes (connection error and non-2xx response), all with the HTTP call
+mocked so the test suite makes no real network requests.

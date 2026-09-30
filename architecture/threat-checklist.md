@@ -32,9 +32,10 @@ teardown discipline) — not for a hypothetical production rollout.
 
 | Threat (STRIDE) | Description | Mitigation | Status |
 |---|---|---|---|
-| Tampering | If wired to a real webhook/email API later, a malicious payload could be used for header/template injection | Currently a stub — no outbound call is made, so no real attack surface exists yet | N/A today; **must be re-reviewed** before wiring a real notification channel (see `app/notify.py` docstring) |
-| Denial of service (to the system, not the user) | A slow/unreachable notification endpoint could block the request | Notification failure is caught (`NotificationError`) and logged; it never blocks or fails the primary request — see **Q3** evidence (`fault_report.notify_failed`) | Mitigated |
-| Information disclosure | Ticket details sent to an external service once wired up | Only synthetic data is ever collected, so no real personal data would be disclosed even then | Mitigated by data-policy, not by code |
+| Tampering | A real webhook could be sent a malicious payload (header/template injection) | Only three fixed fields (`ticket_id`, `equipment_id`, `priority`) are ever sent, built server-side from validated data — no user-controlled field (e.g. `description`) reaches the webhook payload | Mitigated |
+| Information disclosure — webhook URL as a secret | A real `NOTIFY_WEBHOOK_URL` lets anyone who has it post to the team's channel | Read from the environment only (`.env`, git-ignored); never hardcoded, logged, or committed — same handling as `DATABASE_URL` | Mitigated |
+| Denial of service (to the system, not the user) | A slow/unreachable notification endpoint could block the request | 5-second timeout (`httpx.post(..., timeout=5.0)`); failure is caught (`NotificationError`) and logged; never blocks or fails the primary request — verified against a real endpoint returning both success and `500` — see `evidence/milestone3_evidence.md` | Mitigated |
+| Information disclosure — ticket data sent externally | Ticket details are sent to whatever service the webhook points at | Only synthetic data is ever collected system-wide, so no real personal data is disclosed even when the channel is real | Mitigated by data-policy, not by code |
 
 ## Cross-cutting: logging
 

@@ -138,152 +138,6 @@ This proves the core resilience requirement: a downstream notification
 failure is logged and does not block or corrupt the primary transaction —
 the ticket is still created and retrievable, just with `notified: false`.
 
-## Second-member reproduction (handbook §6.5)
-
-**Reproduced by:** Mzameni Nkosi (Data & Observability Lead), via the
-zero-GitHub package (`HOW_TO_TEST_THIS.txt`) sent directly, independent
-of the primary development machine. Screenshots in
-[milestone3/second-member-mzameni/](milestone3/second-member-mzameni/).
-
-**What was submitted** (`04-post-faults-filled-body.png`):
-```json
-{
-  "equipment_id": "PC-001",
-  "location": "Computer Lab 1",
-  "description": "Computer is not powering on",
-  "severity": "high",
-  "reporter_id": "STU-001"
-}
-```
-
-**Resulting ticket, retrieved via a separate `GET /faults/{ticket_id}`
-request** (`03-get-ticket-200-response.png`):
-```json
-{
-  "ticket_id": "FR-8330B873",
-  "correlation_id": "4b5a7f31-6236-4605-9d89-4d3b9189c104",
-  "equipment_id": "PC-001",
-  "location": "Computer Lab 1",
-  "description": "Computer is not powering on",
-  "severity": "high",
-  "priority": "P1",
-  "status": "open",
-  "reporter_id": "STU-001",
-  "created_at": "2026-09-30T20:05:19.572444",
-  "notified": true
-}
-```
-HTTP 200, at `http://localhost:8080/faults/FR-8330B873`, response header
-`date: Wed, 30 Sep 2026 20:10:04 GMT` -- five minutes after the ticket's
-`created_at`, consistent with an independent session (submit, then come
-back and look it up), not a single scripted motion.
-
-**What this proves:**
-- The slice runs correctly on a second machine, from the README /
-  `HOW_TO_TEST_THIS.txt` instructions alone, with no live help from the
-  original developer -- satisfying §6.2's "create the environment from
-  repository instructions on a clean machine."
-- `severity: "high"` correctly derived `priority: "P1"` on an
-  independent run (**F3**), not just in the primary developer's tests.
-- A ticket persisted via `POST /faults` was retrieved via a *separate*
-  `GET /faults/{ticket_id}` request (**F4**), reproduced independently.
-- `reporter_id: "STU-001"` -- a synthetic ID, consistent with the
-  Milestone 1 ethical/privacy boundary.
-- `01-post-faults-form.png` and `02-response-schema-reference.png` show
-  the Swagger UI before submission and the documented response schema;
-  included for completeness even though they aren't live-call evidence.
-
-This is the second of the two reproductions required by §6.5's
-acceptance checklist ("at least two members have reproduced the
-slice") -- the first being the original developer's own runs captured
-throughout this document.
-
-## Third and fourth member reproduction (handbook §6.5)
-
-Two more team members reproduced the slice independently, each on their
-own machine, going beyond the handbook's minimum of two reproductions.
-
-**Andiswa Ngcobo (Architecture and Integration Lead).** Screenshots in
-[milestone3/third-member-andiswa/](milestone3/third-member-andiswa/).
-Her terminal shows the path `C:\Users\ngcob\Desktop\cloud computing\cloud-fault-service`,
-confirming this ran on her own machine, not the original development
-machine. She started the stack from the repository instructions alone:
-
-```
-PS C:\Users\ngcob\Desktop\cloud computing\cloud-fault-service> docker compose up --build -d
-PS C:\Users\ngcob\Desktop\cloud computing\cloud-fault-service> docker compose ps
-NAME                        STATUS                 PORTS
-cloud-fault-service-app-1   Up 40 seconds          0.0.0.0:8080->8080/tcp
-cloud-fault-service-db-1    Up 46 seconds (healthy) 0.0.0.0:5432->5432/tcp
-PS ...> docker compose logs app
-app-1  | INFO:     Started server process [1]
-app-1  | INFO:     Waiting for application startup.
-app-1  | INFO:     Application startup complete.
-app-1  | INFO:     Uvicorn running on http://0.0.0.0:8080
-```
-
-She then submitted a report with three required fields missing
-(`equipment_id`, `location`, `description`) and confirmed it was
-rejected safely:
-```json
-{
-  "detail": {
-    "error": "invalid_request",
-    "detail": "One or more fields failed validation.",
-    "correlation_id": "7c5e4950-917b-4039-9a43-abbcbf7f950c",
-    "errors": [
-      {"loc": ["equipment_id"], "msg": "Field required", "type": "missing"},
-      {"loc": ["location"], "msg": "Field required", "type": "missing"},
-      {"loc": ["description"], "msg": "Field required", "type": "missing"}
-    ]
-  }
-}
-```
-HTTP 400, response header `date: Fri, 02 Oct 2026 17:19:58 GMT`. This
-proves the environment builds cleanly on a third machine and that the
-invalid-input path works independently of the primary developer's own
-tests.
-
-**Sandile Luthuli (Function/Application Developer).** Screenshots in
-[milestone3/fourth-member-sandile/](milestone3/fourth-member-sandile/).
-He submitted and then retrieved his own ticket:
-```json
-{
-  "ticket_id": "FR-44D2E1E5",
-  "correlation_id": "84693f76-1b22-4917-9394-8b4da1aa604c",
-  "equipment_id": "PRJ-007",
-  "location": "Main Library, Room 3",
-  "description": "Projector shows no signal.",
-  "severity": "medium",
-  "priority": "P2",
-  "status": "open",
-  "reporter_id": "STU-002",
-  "created_at": "2026-10-02T17:32:39.832943",
-  "notified": true
-}
-```
-Retrieved via `GET /faults/FR-44D2E1E5`, HTTP 200, response header
-`date: Fri, 02 Oct 2026 17:38:19 GMT`, roughly five and a half minutes
-after `created_at`, again consistent with a genuine independent session
-rather than one continuous action. `severity: "medium"` correctly
-produced `priority: "P2"` on his machine, independent of every other
-run of this same check.
-
-Three of the five team members, Mzameni, Andiswa and Sandile, have now
-independently reproduced this slice. Each confirmed a different part
-of it: Mzameni the full valid submission and retrieval path, Andiswa
-the environment startup and the invalid-input path, Sandile the full
-valid submission and retrieval path on a third, separate machine.
-
-Mluleki Nkosinathi Mzelemu built this service and ran it throughout
-its development, that work is the primary developer's own testing
-documented across this entire evidence pack, not a reproduction, since
-§6.5's requirement is specifically about someone other than the
-builder getting it working independently. Andiswa Anele Xulu also ran
-the stack and exercised the endpoints herself; her run is not written
-up with screenshots here, since the three independent reproductions
-above already exceed the handbook's minimum of two required by §6.5.
-
 ## Known scope decisions (confirmed, not defects)
 
 - **Notifications** support a real webhook (`NOTIFY_WEBHOOK_URL`, added
@@ -325,86 +179,97 @@ successful webhook post, Discord payload formatting, and both failure
 modes (connection error and non-2xx response), all with the HTTP call
 mocked so the test suite makes no real network requests.
 
-## Real email channel evidence (2026-10-02)
+## Data & Observability Verification — Mzameni Nkosi (2026-09-30)
 
-`app/notify.py` was extended further so `NOTIFY_EMAIL_API_KEY` sends a
-real email via the Resend API (`https://api.resend.com/emails`), ahead
-of the webhook path if both are configured. First attempt caught a
-real bug: `docker-compose.yml` was not passing the new
-`NOTIFY_EMAIL_API_KEY`/`NOTIFY_EMAIL_TO`/`NOTIFY_EMAIL_FROM` variables
-into the container at all, so the first test silently fell through to
-the no-op stub (response came back in 26 milliseconds, far too fast
-for a real HTTPS call). Fixed by adding the three variables to the
-app service's `environment:` block, the same class of bug as the
-force-failure flags caught earlier in the project.
+As the Data & Observability Lead, I independently reproduced the
+Milestone 3 service on Ubuntu 24.04.4 LTS using Docker Desktop.
 
-Once fixed, tested against the real, live Resend endpoint (not a mock
-or echo server) with a deliberately invalid API key, so the failure
-path could be proven without needing a paid account:
+### Environment
 
-```
-NOTIFY_EMAIL_API_KEY=re_fake_key_to_test_real_endpoint
-NOTIFY_EMAIL_TO=maintenance@example.test
+- Operating system: Ubuntu 24.04.4 LTS
+- Docker Desktop: 4.93.0
+- Application: FastAPI Fault Reporting Service
+- Database: PostgreSQL 16
+- API documentation: http://localhost:8080/docs
 
-POST /faults -> 201, "notified": false  (ticket still persisted)
-Round trip: 1.3 seconds (confirms this genuinely left the container
-and reached api.resend.com, unlike the earlier 26ms false pass)
-log: fault_report.notify_failed, reason: "Email send failed: Client
-     error '401 Unauthorized' for url 'https://api.resend.com/emails'"
-```
+### QA Test 1 — Valid fault submission
 
-Reset to the default (no email or webhook configured) and reconfirmed
-the original zero-dependency stub still returns `notified: true` with
-no external call, exactly as before this change. 26/26 tests pass,
-including 5 new unit tests covering the email success path, the email
-takes priority over webhook rule, a missing-recipient configuration
-error, and the email HTTP-failure path, all mocked so the automated
-suite makes no real network calls, the real-network proof above was
-run manually against the live stack instead.
+A valid POST request was submitted to `/faults`.
 
-## Maintenance status update evidence (2026-10-02)
+Result: **HTTP 201 Created**
 
-`PATCH /faults/{ticket_id}/status` added, see
-`architecture/decisions/0002-maintenance-status-updates.md`. Verified
-against the rebuilt live stack with `MAINTENANCE_API_KEY=test-live-key-123`:
+Ticket ID: `FR-8330B873`
 
-```
-Submitted ticket FR-3DC711A8.
+Correlation ID: `4b5a7f31-6236-4605-9d89-4d3b9189c104`
 
-Without a key:
-PATCH .../status {"status":"in_progress"}
--> 403 forbidden
+The response contained the expected ticket ID, correlation ID, severity,
+priority P1, open status, and notification result.
 
-With the wrong key (X-Maintenance-Key: wrong):
--> 403 forbidden
+### QA Test 2 — Retrieve submitted fault
 
-With the correct key:
--> 200, "status": "in_progress"
-log: fault_report.status_updated, old_status: open, new_status: in_progress
+The ticket was retrieved using:
 
-Moved again to resolved with the correct key:
--> 200, "status": "resolved"
-log: fault_report.status_updated, old_status: in_progress, new_status: resolved
+`GET /faults/FR-8330B873`
 
-Confirmed persisted, not just returned in-memory, via a separate
-GET /faults/FR-3DC711A8 -> status: in_progress (checked mid-sequence)
-```
+Result: **HTTP 200 OK**
 
-Then reset the container with no `MAINTENANCE_API_KEY` configured at
-all and retried the same update, this time with a header value present
-(`X-Maintenance-Key: anything-at-all`):
+The returned record matched the submitted fault information.
 
-```
-PATCH .../status {"status":"resolved"}
--> 403 forbidden
-```
+### QA Test 3 — Invalid request: missing reporter_id
 
-Confirms the fail-closed design: a request with *some* key attached
-still cannot succeed when no key is configured server-side, there is
-no accidental default-open state. 32/32 tests pass, including 6 new
-tests in `tests/test_api.py` covering the correct-key success path,
-missing key, wrong key, unconfigured key, an unknown ticket, and an
-invalid status value (confirmed to come back `400` in the app's own
-error shape via the same global malformed-request handler used
-everywhere else, not FastAPI's default `422`, verified by actually
-running the test before trusting the assumption).
+A request without the required `reporter_id` field was submitted.
+
+Result: **HTTP 400 Bad Request**
+
+The service rejected the request rather than accepting incomplete data.
+
+### QA Test 4 — Invalid JSON
+
+A malformed JSON request was submitted with a missing comma.
+
+Result: **HTTP 400 Bad Request**
+
+The service rejected the malformed request.
+
+### QA observations
+
+The independent reproduction confirmed that the service can be started
+locally, accepts valid fault reports, retrieves persisted tickets, and
+rejects invalid requests.
+
+During reproduction, an archive extraction issue was identified where
+application filenames contained literal backslashes. The application
+directory was corrected before rebuilding the Docker image.
+
+The API also initially rejected a test request because `reporter_id` was
+required. This confirmed that the validation requirement is enforced.
+
+Evidence for the successful POST and GET responses was captured as
+screenshots during the independent QA test.
+
+
+
+## Data & Observability Contribution — Mzameni Nkosi (2026-09-30)
+
+Role: Data & Observability Lead
+
+Responsibilities completed:
+
+- Reviewed the data flow for fault report submission and retrieval.
+- Verified that fault reports are persisted and can be retrieved using the ticket ID.
+- Reviewed structured logging to ensure important system events are recorded.
+- Verified that correlation IDs allow tracing of a request across acceptance,
+  notification and persistence stages.
+
+Evidence reviewed:
+
+- `app/persistence.py` for database persistence handling.
+- `app/logging_utils.py` for structured JSON logging and correlation IDs.
+- Milestone 3 evidence showing accepted, rejected, persisted and failed events
+  linked through correlation IDs.
+
+The contribution supports system observability by ensuring that stored data,
+application events and request tracing can be verified during testing and
+demonstration.
+
+

@@ -73,14 +73,29 @@ submission, retrieval, invalid input (missing field, bad severity),
 a simulated dependency failure (`DB_FORCE_FAILURE=1`), and a
 notification degradation case (`NOTIFY_FORCE_FAILURE=1`) that proves
 the ticket is still persisted even when the downstream notification
-fails.
+fails. All 17 tests pass as of the last run recorded in
+`evidence/milestone3_evidence.md`.
 
-> Note: this code was written and syntax-checked (`python -m py_compile`)
-> in an environment without package-registry access, so the test suite
-> itself has not yet been executed end-to-end. Run `pytest -v` as your
-> first step and paste back any failures — they're most likely to be
-> minor version-compatibility issues with the pinned FastAPI/Pydantic/
-> SQLAlchemy versions in `requirements.txt`, not logic errors.
+## Reproduce the full evidence pack
+
+Once the stack is running (`docker compose up --build -d`), run every
+Milestone 3 scenario in one go and print the results:
+
+```bash
+bash scripts/smoke_test.sh
+```
+
+To trace one request end-to-end through the structured logs (the
+correlation-ID requirement, **Q4**): copy the `correlation_id` from any
+response, then:
+
+```bash
+docker compose logs app | grep <correlation_id>
+```
+
+You should see one JSON line per stage that request passed through
+(e.g. `accepted` → `notified` or `notify_failed` → `persisted`), all
+sharing the same ID.
 
 ## API examples
 
@@ -140,15 +155,36 @@ gcloud sql instances delete fault-service-db
 ## Repository map
 
 ```
-app/                  application source (validation, processing, persistence, notify, API)
-tests/                pytest unit + component tests
-architecture/          event contract, decision records
-scripts/               deployment script
-evidence/               (fill in during Milestone 3/4 with logs/screenshots per milestone)
-docker-compose.yml     local distributed stack
-Dockerfile             container build for Cloud Run / local Docker
-.env.example           documented config keys -- copy to .env, never commit .env
+app/                    application source (validation, processing, persistence, notify, API)
+tests/                  pytest unit + component tests
+architecture/           event contract, diagrams, decision records, interface
+                        contracts, threat checklist, cost worksheet, failure
+                        table, Milestone 3 integration plan
+scripts/                provision_gcp.sh, deploy_gcp.sh, smoke_test.sh
+evidence/               milestone3_evidence.md -- captured evidence pack,
+                        reproducible on demand with scripts/smoke_test.sh
+docker-compose.yml      local distributed stack
+Dockerfile              container build for Cloud Run / local Docker
+.env.example            documented config keys -- copy to .env, never commit .env
 ```
+
+## Milestone 3 reproduction checklist (handbook §6.2 / §6.5)
+
+Required: at least two team members must independently reproduce this
+slice. If you are the second (or third, etc.) person doing this, follow
+these steps from a clean clone with no help from whoever set it up
+originally, then add your result to `evidence/milestone3_evidence.md`:
+
+1. `git clone` this repository fresh.
+2. `docker compose up --build -d` -- no other setup should be needed.
+3. `bash scripts/smoke_test.sh` -- confirm every scenario matches what's
+   already recorded in `evidence/milestone3_evidence.md`.
+4. Pick one `correlation_id` from the output and trace it through
+   `docker compose logs app | grep <correlation_id>`.
+5. Note anything that didn't work, wasn't clear, or needed an
+   undocumented step -- that's exactly what this check is for. Record it
+   as a new entry in `architecture/decisions/` if it changes a prior
+   decision, or as a note in `evidence/milestone3_evidence.md` either way.
 
 ## Known limitations (state these in the report, don't hide them)
 

@@ -1,0 +1,101 @@
+HOW TO TEST THIS PROJECT (10-15 minutes)
+==========================================
+
+Hi! This is the Fault Reporting Service for our Cloud Computing group
+project. I need you to run it on YOUR OWN laptop, by yourself, without
+me helping in real time. This is a course requirement -- the module
+needs proof that a second team member (not just me) can get it running
+from these instructions alone.
+
+Please take screenshots as you go (see step 6) and send them back to
+me, along with anything that was confusing or didn't work.
+
+
+STEP 1 - Install Docker Desktop
+--------------------------------
+Go to: https://www.docker.com/products/docker-desktop/
+Download it for your operating system (Windows or Mac) and install it.
+This can take 10-15 minutes and may ask you to restart your computer.
+
+Once installed, open Docker Desktop and wait until it says it's
+"running" (there's usually a whale icon in your system tray / menu
+bar that stops animating once it's ready).
+
+
+STEP 2 - Unzip the project
+----------------------------
+Unzip the file I sent you (cloud-fault-service.zip) anywhere on your
+computer, e.g. your Desktop or Downloads folder.
+
+
+STEP 3 - Open a terminal in that folder
+------------------------------------------
+Windows: open the unzipped "cloud-fault-service" folder in File
+Explorer, click in the address bar, type "cmd" and press Enter.
+
+Mac: open Terminal (search for it with Spotlight), type "cd " (with a
+space after), then drag the unzipped folder into the terminal window,
+then press Enter.
+
+
+STEP 4 - Start the project
+-----------------------------
+In that terminal, type exactly this and press Enter:
+
+    docker compose up --build
+
+Wait. The first time, it downloads and builds things, so it can take a
+few minutes. You'll see a lot of text scroll past. Wait until it settles
+down and you see lines mentioning "Uvicorn running" or "Application
+startup complete" and it stops scrolling.
+
+Leave this terminal window open and running.
+
+
+STEP 5 - Open it in your browser
+------------------------------------
+Go to this address in your web browser:
+
+    http://localhost:8080/docs
+
+You should see a page titled "Fault Reporting Service" with a list of
+endpoints (POST /faults, GET /faults/{ticket_id}, GET /health).
+
+
+STEP 6 - Submit a test report (and take screenshots!)
+----------------------------------------------------------
+1. Click on "POST /faults" to expand it.
+2. Click the "Try it out" button.
+3. Leave the example text as it is, or edit it if you like.
+4. Click the blue "Execute" button.
+5. Scroll down a little -- you should see a "Server response" with
+   code 201 and a ticket_id in the response body.
+
+   >>> TAKE A SCREENSHOT of this response. <<<
+
+6. Copy the ticket_id value (something like "FR-XXXXXXXX").
+7. Click on "GET /faults/{ticket_id}" to expand it.
+8. Click "Try it out", paste the ticket_id into the box, click
+   "Execute".
+9. You should get the same ticket back with code 200.
+
+   >>> TAKE A SCREENSHOT of this response too. <<<
+
+
+STEP 7 - Send it back to me
+-------------------------------
+Send me:
+  - The two screenshots from Step 6
+  - Whether anything was confusing, slow, or didn't work exactly as
+    described above (this is genuinely useful, not a complaint --
+    it's exactly what the module wants us to find and write down)
+
+
+STEP 8 (optional but appreciated) - Stop it when you're done
+------------------------------------------------------------------
+Back in the terminal from Step 4, press Ctrl+C to stop it, or run:
+
+    docker compose down -v
+
+Thanks! This is a real, required part of our group mark, so I really
+appreciate you taking the 10-15 minutes to do this.

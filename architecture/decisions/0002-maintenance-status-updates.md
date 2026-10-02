@@ -2,11 +2,10 @@
 
 ## Status
 
-Decided 2026-10-02. This amends an explicit exclusion from the
-Milestone 1 proposal, which stated: *"changes to the ticket after it
-has been created"* and *"in progress" and "resolved" ticket statuses
-will not be implemented"* were out of scope. This record exists so
-that reversal is traceable, not silent, per the ADR discipline already
+Decided 2026-10-02. This amends explicit exclusions from the Milestone 1 proposal,
+which stated that *"changes to the ticket after it has been created"*
+and the *"in progress" and "resolved" ticket statuses* were out of
+scope. This record exists so that reversal is traceable, not silent, per the ADR discipline already
 used in [0001-platform-and-stack.md](0001-platform-and-stack.md).
 
 ## Decision
@@ -22,8 +21,9 @@ request to this endpoint is refused, there is no default-open state.
 
 The reporter-facing side of the system was complete and tested, but
 the maintenance side had a real, named gap: tickets could be created
-and read, but never acted on, so a reporter had no way to know their
-fault was actually being worked on, only that it had been logged.
+and read, but their status could not be updated. A reporter therefore
+had no way to know whether their fault was actually being worked on;
+they could only see that it had been logged.
 
 ## Options considered
 
@@ -37,15 +37,15 @@ fault was actually being worked on, only that it had been logged.
    maintenance team" from "a reporter" without needing to know who,
    specifically, within that team made the change. Smallest change
    that still closes the actual gap.
-3. **Do nothing, leave status permanently "open".** Rejected because
-   it was the thing actually being asked for: a reporter should not
+3. **Do nothing and leave the status permanently "open".** Rejected
+   because it was the thing actually being asked for: a reporter should not
    have to wait indefinitely with zero visibility into whether their
    fault is even being looked at.
 
 ## Consequences
 
-- This is a real, if small, widening of scope past what Milestone 1
-  and Milestone 2 documented. The Milestone 1 proposal's exclusions
+- This is a real, although small, widening of scope beyond what
+  Milestones 1 and 2 documented. The Milestone 1 proposal's exclusions
   list, and the "No endpoint mutates a ticket after creation" line
   in `architecture/interface-contracts.md`, are both now inaccurate
   unless updated, which this change does alongside this record.

@@ -269,10 +269,11 @@ rather than one continuous action. `severity: "medium"` correctly
 produced `priority: "P2"` on his machine, independent of every other
 run of this same check.
 
-Between Mzameni, Andiswa and Sandile, three of the five team members
-have now independently reproduced this slice, each confirming a
-different part of it: environment startup, the invalid-input path, and
-the full valid submission and retrieval path.
+Three of the five team members, Mzameni, Andiswa and Sandile, have now
+independently reproduced this slice. Each confirmed a different part
+of it: Mzameni the full valid submission and retrieval path, Andiswa
+the environment startup and the invalid-input path, Sandile the full
+valid submission and retrieval path on a third, separate machine.
 
 Mluleki Nkosinathi Mzelemu built this service and ran it throughout
 its development, that work is the primary developer's own testing

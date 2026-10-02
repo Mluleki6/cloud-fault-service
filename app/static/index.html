@@ -49,14 +49,19 @@
   button:disabled { background: #999; cursor: not-allowed; }
   .result {
     margin-top: 1rem;
-    padding: 0.75rem;
+    padding: 0.85rem 1rem;
     border-radius: 4px;
-    font-size: 0.9rem;
-    white-space: pre-wrap;
-    word-break: break-word;
+    font-size: 0.92rem;
   }
   .result.ok { background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; }
   .result.err { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+  .result .heading { font-weight: 700; margin-bottom: 0.5rem; font-size: 0.98rem; }
+  .result dl { margin: 0; }
+  .result dl div { display: flex; gap: 0.5rem; padding: 0.15rem 0; }
+  .result dt { font-weight: 600; min-width: 8.5rem; flex-shrink: 0; }
+  .result dd { margin: 0; word-break: break-word; }
+  .result ul { margin: 0.25rem 0 0; padding-left: 1.2rem; }
+  .result li { padding: 0.1rem 0; }
   .hint { color: #777; font-size: 0.8rem; margin-top: 0.25rem; }
   footer { text-align: center; color: #999; font-size: 0.8rem; margin-top: 2rem; }
 </style>
@@ -108,16 +113,62 @@
 <footer>4CPS501B Cloud Computing Systems, Group 2. API docs at <a href="/docs">/docs</a>.</footer>
 
 <script>
-function showResult(el, ok, text) {
-  el.className = "result " + (ok ? "ok" : "err");
+const FIELD_LABELS = {
+  equipment_id: "Equipment ID",
+  location: "Location",
+  description: "Description",
+  severity: "Severity",
+  reporter_id: "Reporter ID",
+  body: "Request",
+};
+
+function fieldLabel(loc) {
+  const last = Array.isArray(loc) ? loc[loc.length - 1] : loc;
+  return FIELD_LABELS[last] || String(last);
+}
+
+function setPlain(el, text) {
+  el.className = "result";
   el.textContent = text;
+}
+
+function showTicket(el, heading, data) {
+  el.className = "result ok";
+  el.innerHTML =
+    '<div class="heading">' + heading + "</div>" +
+    "<dl>" +
+    "<div><dt>Ticket ID</dt><dd>" + data.ticket_id + "</dd></div>" +
+    "<div><dt>Equipment</dt><dd>" + data.equipment_id + "</dd></div>" +
+    "<div><dt>Location</dt><dd>" + data.location + "</dd></div>" +
+    "<div><dt>Description</dt><dd>" + data.description + "</dd></div>" +
+    "<div><dt>Severity</dt><dd>" + data.severity + "</dd></div>" +
+    "<div><dt>Priority</dt><dd>" + data.priority + "</dd></div>" +
+    "<div><dt>Status</dt><dd>" + data.status + "</dd></div>" +
+    "<div><dt>Reporter</dt><dd>" + data.reporter_id + "</dd></div>" +
+    "<div><dt>Reported at</dt><dd>" + new Date(data.created_at).toLocaleString() + "</dd></div>" +
+    "<div><dt>Maintenance notified</dt><dd>" + (data.notified ? "Yes" : "No, this will be retried") + "</dd></div>" +
+    "</dl>";
+}
+
+function showRejected(el, heading, detail) {
+  el.className = "result err";
+  let body;
+  if (detail && Array.isArray(detail.errors) && detail.errors.length) {
+    body = "<ul>" + detail.errors.map((e) =>
+      "<li><strong>" + fieldLabel(e.loc) + ":</strong> " + e.msg + "</li>"
+    ).join("") + "</ul>";
+  } else {
+    const message = typeof detail === "string" ? detail
+      : (detail && detail.detail) || "Something went wrong, please try again.";
+    body = "<div>" + message + "</div>";
+  }
+  el.innerHTML = '<div class="heading">' + heading + "</div>" + body;
 }
 
 document.getElementById("submitForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const resultEl = document.getElementById("submitResult");
-  resultEl.textContent = "Submitting...";
-  resultEl.className = "result";
+  setPlain(resultEl, "Submitting...");
 
   const body = {
     equipment_id: document.getElementById("equipment_id").value.trim(),
@@ -135,19 +186,14 @@ document.getElementById("submitForm").addEventListener("submit", async (e) => {
     });
     const data = await res.json();
     if (res.ok) {
-      showResult(resultEl, true,
-        "Ticket created: " + data.ticket_id +
-        "\nPriority: " + data.priority +
-        "\nStatus: " + data.status +
-        "\nNotified: " + data.notified +
-        "\nCorrelation ID: " + data.correlation_id);
+      showTicket(resultEl, "Report submitted", data);
       document.getElementById("ticket_id").value = data.ticket_id;
     } else {
-      const detail = data.detail || data;
-      showResult(resultEl, false, "Rejected: " + JSON.stringify(detail, null, 2));
+      showRejected(resultEl, "We could not submit this report", data.detail || data);
     }
   } catch (err) {
-    showResult(resultEl, false, "Could not reach the service: " + err.message);
+    setPlain(resultEl, "Could not reach the service. Check your connection and try again.");
+    resultEl.className = "result err";
   }
 });
 
@@ -155,20 +201,22 @@ document.getElementById("lookupForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const resultEl = document.getElementById("lookupResult");
   const id = document.getElementById("ticket_id").value.trim();
-  resultEl.textContent = "Looking up...";
-  resultEl.className = "result";
+  setPlain(resultEl, "Looking up...");
 
   try {
     const res = await fetch("/faults/" + encodeURIComponent(id));
     const data = await res.json();
     if (res.ok) {
-      showResult(resultEl, true, JSON.stringify(data, null, 2));
+      showTicket(resultEl, "Ticket found", data);
     } else {
       const detail = data.detail || data;
-      showResult(resultEl, false, "Not found: " + JSON.stringify(detail, null, 2));
+      const message = (detail && detail.detail) || "No ticket found with that ID.";
+      resultEl.className = "result err";
+      resultEl.innerHTML = '<div class="heading">Not found</div><div>' + message + "</div>";
     }
   } catch (err) {
-    showResult(resultEl, false, "Could not reach the service: " + err.message);
+    setPlain(resultEl, "Could not reach the service. Check your connection and try again.");
+    resultEl.className = "result err";
   }
 });
 </script>

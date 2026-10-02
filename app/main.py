@@ -2,7 +2,8 @@
 Fault Reporting Service -- FastAPI app.
 
 Endpoints:
-  POST /faults        submit a fault report (use cases 1-6, 8)
+  GET  /               simple HTML form for submitting and looking up tickets
+  POST /faults         submit a fault report (use cases 1-6, 8)
   GET  /faults/{id}    retrieve a ticket by ID (use case 7)
   GET  /health         liveness check
 
@@ -13,10 +14,11 @@ Deploy to Cloud Run:  see scripts/deploy_gcp.sh
 import os
 import uuid
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import ValidationError
 
 from app.logging_utils import log_event
@@ -63,6 +65,17 @@ async def malformed_request_handler(request: Request, exc: RequestValidationErro
             "errors": safe_errors,
         },
     )
+
+
+_STATIC_DIR = Path(__file__).parent / "static"
+
+
+@app.get("/", include_in_schema=False)
+def serve_form():
+    # A plain HTML form so a reporter can use this without reading API
+    # docs. Calls the same POST /faults and GET /faults/{id} endpoints
+    # below, no separate backend path, no authentication, no new scope.
+    return FileResponse(_STATIC_DIR / "index.html")
 
 
 @app.get("/health")

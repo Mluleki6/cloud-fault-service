@@ -198,6 +198,82 @@ acceptance checklist ("at least two members have reproduced the
 slice") -- the first being the original developer's own runs captured
 throughout this document.
 
+## Third and fourth member reproduction (handbook §6.5)
+
+Two more team members reproduced the slice independently, each on their
+own machine, going beyond the handbook's minimum of two reproductions.
+
+**Andiswa Ngcobo (Architecture and Integration Lead).** Screenshots in
+[milestone3/third-member-andiswa/](milestone3/third-member-andiswa/).
+Her terminal shows the path `C:\Users\ngcob\Desktop\cloud computing\cloud-fault-service`,
+confirming this ran on her own machine, not the original development
+machine. She started the stack from the repository instructions alone:
+
+```
+PS C:\Users\ngcob\Desktop\cloud computing\cloud-fault-service> docker compose up --build -d
+PS C:\Users\ngcob\Desktop\cloud computing\cloud-fault-service> docker compose ps
+NAME                        STATUS                 PORTS
+cloud-fault-service-app-1   Up 40 seconds          0.0.0.0:8080->8080/tcp
+cloud-fault-service-db-1    Up 46 seconds (healthy) 0.0.0.0:5432->5432/tcp
+PS ...> docker compose logs app
+app-1  | INFO:     Started server process [1]
+app-1  | INFO:     Waiting for application startup.
+app-1  | INFO:     Application startup complete.
+app-1  | INFO:     Uvicorn running on http://0.0.0.0:8080
+```
+
+She then submitted a report with three required fields missing
+(`equipment_id`, `location`, `description`) and confirmed it was
+rejected safely:
+```json
+{
+  "detail": {
+    "error": "invalid_request",
+    "detail": "One or more fields failed validation.",
+    "correlation_id": "7c5e4950-917b-4039-9a43-abbcbf7f950c",
+    "errors": [
+      {"loc": ["equipment_id"], "msg": "Field required", "type": "missing"},
+      {"loc": ["location"], "msg": "Field required", "type": "missing"},
+      {"loc": ["description"], "msg": "Field required", "type": "missing"}
+    ]
+  }
+}
+```
+HTTP 400, response header `date: Fri, 02 Oct 2026 17:19:58 GMT`. This
+proves the environment builds cleanly on a third machine and that the
+invalid-input path works independently of the primary developer's own
+tests.
+
+**Sandile Luthuli (Function/Application Developer).** Screenshots in
+[milestone3/fourth-member-sandile/](milestone3/fourth-member-sandile/).
+He submitted and then retrieved his own ticket:
+```json
+{
+  "ticket_id": "FR-44D2E1E5",
+  "correlation_id": "84693f76-1b22-4917-9394-8b4da1aa604c",
+  "equipment_id": "PRJ-007",
+  "location": "Main Library, Room 3",
+  "description": "Projector shows no signal.",
+  "severity": "medium",
+  "priority": "P2",
+  "status": "open",
+  "reporter_id": "STU-002",
+  "created_at": "2026-10-02T17:32:39.832943",
+  "notified": true
+}
+```
+Retrieved via `GET /faults/FR-44D2E1E5`, HTTP 200, response header
+`date: Fri, 02 Oct 2026 17:38:19 GMT`, roughly five and a half minutes
+after `created_at`, again consistent with a genuine independent session
+rather than one continuous action. `severity: "medium"` correctly
+produced `priority: "P2"` on his machine, independent of every other
+run of this same check.
+
+Between Mzameni, Andiswa and Sandile, three of the five team members
+have now independently reproduced this slice, each confirming a
+different part of it: environment startup, the invalid-input path, and
+the full valid submission and retrieval path.
+
 ## Known scope decisions (confirmed, not defects)
 
 - **Notifications** support a real webhook (`NOTIFY_WEBHOOK_URL`, added

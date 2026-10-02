@@ -52,3 +52,10 @@ def save_ticket(session, ticket: Ticket) -> Ticket:
 
 def get_ticket(session, ticket_id: str):
     return session.get(Ticket, ticket_id)
+
+
+def update_ticket_status(session, ticket: Ticket, new_status: str) -> Ticket:
+    ticket.status = new_status
+    session.commit()
+    session.refresh(ticket)
+    return ticket

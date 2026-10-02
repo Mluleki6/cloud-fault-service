@@ -3,8 +3,11 @@
 A small cloud-based event service: a user reports a faulty piece of
 equipment or facility, the system validates it, assigns a ticket ID and
 priority, persists it, attempts a downstream notification, and lets
-the ticket be retrieved by ID. Built as the first working vertical
-slice for the Cloud Computing Systems group project.
+the ticket be retrieved by ID. The maintenance team can then move that
+ticket through `open` -> `in_progress` -> `resolved` using a shared
+key, so a reporter isn't left wondering whether anyone has seen their
+report. Built as the first working vertical slice for the Cloud
+Computing Systems group project.
 
 ## Architecture
 
@@ -21,6 +24,9 @@ Client  ->  POST /faults  ->  validate  ->  assign ticket + priority
                   structured log (correlation_id ties it all together)
 
 Client  ->  GET /faults/{ticket_id}  ->  retrieve persisted ticket
+
+Maintenance team (shared key)  ->  PATCH /faults/{ticket_id}/status
+                                        ->  open / in_progress / resolved
 ```
 
 | Cloud role | This repo (local) | Managed cloud equivalent |
@@ -119,6 +125,20 @@ Retrieve it:
 curl http://localhost:8080/faults/FR-XXXXXXXX
 ```
 
+Update its status (maintenance team, needs `MAINTENANCE_API_KEY` set
+first, see `.env.example`):
+
+```bash
+curl -X PATCH http://localhost:8080/faults/FR-XXXXXXXX/status \
+  -H "Content-Type: application/json" \
+  -H "X-Maintenance-Key: your-shared-key" \
+  -d '{"status": "in_progress"}'
+```
+
+Allowed values: `open`, `in_progress`, `resolved`. Without the correct
+key, or if `MAINTENANCE_API_KEY` isn't set at all, this always returns
+`403`, there is no default-open fallback.
+
 Simulate the dependency-failure case:
 
 ```bash
@@ -213,5 +233,9 @@ verified against a live endpoint returning both 2xx and 5xx responses.
 
 - No duplicate-submission detection (idempotency) beyond ticket-ID
   uniqueness — out of scope for the MVP.
-- No authentication/authorization layer yet — add before treating this
-  as anything beyond a course prototype.
+- No per-reporter authentication/authorization — add before treating
+  this as anything beyond a course prototype.
+- Maintenance status updates use one shared key for the whole team, not
+  per-person accounts — there is no individual audit trail beyond the
+  structured log, a deliberate trade-off, not an oversight. See
+  `architecture/decisions/0002-maintenance-status-updates.md`.

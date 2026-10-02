@@ -33,6 +33,7 @@ services:
       NOTIFY_EMAIL_API_KEY: "${NOTIFY_EMAIL_API_KEY:-}"
       NOTIFY_EMAIL_TO: "${NOTIFY_EMAIL_TO:-}"
       NOTIFY_EMAIL_FROM: "${NOTIFY_EMAIL_FROM:-onboarding@resend.dev}"
+      MAINTENANCE_API_KEY: "${MAINTENANCE_API_KEY:-}"
     depends_on:
       db:
         condition: service_healthy

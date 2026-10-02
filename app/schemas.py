@@ -18,6 +18,12 @@ class Severity(str, Enum):
     high = "high"
 
 
+class TicketStatus(str, Enum):
+    open = "open"
+    in_progress = "in_progress"
+    resolved = "resolved"
+
+
 class FaultReportIn(BaseModel):
     """Inbound event: what a reporter submits."""
 
@@ -52,6 +58,12 @@ class FaultReportOut(BaseModel):
     reporter_id: str
     created_at: datetime
     notified: bool
+
+
+class StatusUpdateIn(BaseModel):
+    """Maintenance-only: move a ticket to a new status."""
+
+    status: TicketStatus
 
 
 class ErrorResponse(BaseModel):

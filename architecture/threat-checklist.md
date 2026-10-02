@@ -18,7 +18,22 @@ teardown discipline) — not for a hypothetical production rollout.
 | Repudiation | Reporter denies having submitted a report | Every accepted request is logged with a `correlation_id` and timestamp | Mitigated (logging only — no signing) |
 | Information disclosure | Reporter fields could carry real personal data despite the synthetic-ID assumption | No format check *forces* synthetic data; this is a policy/process control, not a code control | **Accepted risk** — team must enforce via test-data discipline, per Milestone 1 §2 ethical boundary |
 | Denial of service | Endpoint has no rate limiting; a flood of requests could exhaust DB connections | None at the application layer; Cloud Run's autoscaling absorbs some load, but this is not a real DoS mitigation | **Accepted risk** — out of scope for a course prototype; would need rate limiting before any real deployment |
-| Elevation of privilege | N/A — no privilege levels exist in this system | — | N/A |
+| Elevation of privilege | **Updated 2026-10-02** — one privilege boundary now exists: holding `MAINTENANCE_API_KEY` lets a caller change a ticket's status, which a reporter cannot do | See the dedicated section below | Mitigated, with a named limitation |
+
+## Reporter → Maintenance status update (`PATCH /faults/{ticket_id}/status`)
+
+Added 2026-10-02, see [decisions/0002-maintenance-status-updates.md](decisions/0002-maintenance-status-updates.md).
+This is the one place in the system with any access distinction at all,
+so it gets its own table rather than a single row.
+
+| Threat (STRIDE) | Description | Mitigation | Status |
+|---|---|---|---|
+| Elevation of privilege | A reporter (or anyone) tries to change ticket status without the key | Request is refused with `403` unless `X-Maintenance-Key` matches `MAINTENANCE_API_KEY` exactly | Mitigated |
+| Elevation of privilege | `MAINTENANCE_API_KEY` is never configured (e.g. forgotten in a deploy) | Fails closed: every request is refused, there is no default-open behaviour if the key is unset | Mitigated by design |
+| Tampering | A timing attack on the key comparison, guessing the key one character at a time via response-time differences | `hmac.compare_digest` used for the comparison instead of `==`, which is not constant-time | Mitigated |
+| Information disclosure | `MAINTENANCE_API_KEY` as a secret, anyone who has it can change any ticket's status | Read from the environment only, same handling as `DATABASE_URL`; confirmed absent from the repository by the same `detect-secrets` scan covering every other credential (see `architecture/final-test-set.md`) | Mitigated |
+| Repudiation | No way to tell *which* maintenance team member made a given status change, since the key is shared, not per-person | Every change is logged with `old_status`, `new_status`, `ticket_id`, and `correlation_id`, but not an individual's identity | **Accepted, named limitation** — this is the explicit trade-off of choosing a shared key over per-user accounts, documented in the decision record rather than hidden |
+| Spoofing | Someone other than genuine maintenance staff obtains the key and impersonates them | No technical control beyond the key itself; this is identical in kind to any shared-secret system | **Accepted risk** — proportionate to a course prototype with synthetic data; would need real per-user accounts before any real deployment, exactly the thing this design deliberately avoided for now |
 
 ## API endpoint → Persistence (Postgres / Cloud SQL)
 
@@ -56,13 +71,18 @@ teardown discipline) — not for a hypothetical production rollout.
 
 ## Summary — accepted risks to state explicitly in the report
 
-1. No authentication (Milestone 1 exclusion, by design).
+1. No authentication for reporting or retrieval (Milestone 1 decision, by
+   design).
 2. No rate limiting / DoS protection (out of scope for a course prototype).
 3. Cloud Run deployed publicly (`--allow-unauthenticated`) — needed for a
    markable demo without a login flow; team should confirm this is
    acceptable before Milestone 4.
 4. Local Postgres password is a placeholder, valid only inside the isolated
    Docker Compose network — never exposed to the internet.
+5. Maintenance status updates (added 2026-10-02) use one shared secret for
+   the whole team, not per-user accounts — no individual audit trail beyond
+   the structured log, a deliberate trade-off recorded in
+   `decisions/0002-maintenance-status-updates.md`, not a silent gap.
 
 None of these are silent gaps — each is either an explicit product
 exclusion from Milestone 1 or a documented, reasoned trade-off for a

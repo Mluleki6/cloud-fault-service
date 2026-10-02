@@ -35,5 +35,14 @@
     "errors": [{"loc": ["severity"], "msg": "Input should be...", "type": "enum"}]
   },
   "processing_rule": "severity -> priority: high=P1, medium=P2, low=P3",
-  "idempotency_note": "Each submission creates a new ticket_id; duplicate-detection by content is out of scope for the MVP and is listed as a limitation in the report."
+  "idempotency_note": "Each submission creates a new ticket_id; duplicate-detection by content is out of scope for the MVP and is listed as a limitation in the report.",
+  "status_update_event": {
+    "added": "2026-10-02",
+    "decision_record": "architecture/decisions/0002-maintenance-status-updates.md",
+    "endpoint": "PATCH /faults/{ticket_id}/status",
+    "auth": "X-Maintenance-Key header, must equal the MAINTENANCE_API_KEY environment variable",
+    "request_example": {"status": "in_progress"},
+    "allowed_values": ["open", "in_progress", "resolved"],
+    "note": "This amends the original FaultReport contract, which stated no field changes after creation. See the decision record for why and what this intentionally does not include (no per-user accounts, no audit trail beyond the structured log)."
+  }
 }

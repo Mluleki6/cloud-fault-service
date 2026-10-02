@@ -110,6 +110,28 @@
   <div id="lookupResult"></div>
 </section>
 
+<section>
+  <h2>Maintenance team: update a ticket's status</h2>
+  <p class="hint" style="margin-top:0;">Requires the shared maintenance key. Leave the key blank if you are not on the maintenance team.</p>
+  <form id="statusForm">
+    <label for="status_ticket_id">Ticket ID</label>
+    <input id="status_ticket_id" required placeholder="e.g. FR-9F3A21B0">
+
+    <label for="new_status">New status</label>
+    <select id="new_status">
+      <option value="open">Open</option>
+      <option value="in_progress" selected>In progress</option>
+      <option value="resolved">Resolved</option>
+    </select>
+
+    <label for="maintenance_key">Maintenance key</label>
+    <input id="maintenance_key" type="password" placeholder="Shared key, not your personal password">
+
+    <button type="submit">Update status</button>
+  </form>
+  <div id="statusResult"></div>
+</section>
+
 <footer>4CPS501B Cloud Computing Systems, Group 2. API docs at <a href="/docs">/docs</a>.</footer>
 
 <script>
@@ -213,6 +235,32 @@ document.getElementById("lookupForm").addEventListener("submit", async (e) => {
       const message = (detail && detail.detail) || "No ticket found with that ID.";
       resultEl.className = "result err";
       resultEl.innerHTML = '<div class="heading">Not found</div><div>' + message + "</div>";
+    }
+  } catch (err) {
+    setPlain(resultEl, "Could not reach the service. Check your connection and try again.");
+    resultEl.className = "result err";
+  }
+});
+
+document.getElementById("statusForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const resultEl = document.getElementById("statusResult");
+  const id = document.getElementById("status_ticket_id").value.trim();
+  const status = document.getElementById("new_status").value;
+  const key = document.getElementById("maintenance_key").value;
+  setPlain(resultEl, "Updating...");
+
+  try {
+    const res = await fetch("/faults/" + encodeURIComponent(id) + "/status", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "X-Maintenance-Key": key },
+      body: JSON.stringify({ status }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      showTicket(resultEl, "Status updated", data);
+    } else {
+      showRejected(resultEl, "We could not update this ticket", data.detail || data);
     }
   } catch (err) {
     setPlain(resultEl, "Could not reach the service. Check your connection and try again.");

@@ -99,3 +99,87 @@ def test_notification_failure_degrades_gracefully(client, monkeypatch):
     follow_up = client.get(f"/faults/{body['ticket_id']}")
     assert follow_up.status_code == 200
     assert follow_up.json()["notified"] is False
+
+
+# --- Maintenance status updates ------------------------------------------------
+
+def test_status_update_with_correct_key_succeeds(client, monkeypatch):
+    monkeypatch.setenv("MAINTENANCE_API_KEY", "test-maintenance-key")
+    created = client.post("/faults", json=VALID_PAYLOAD).json()
+
+    resp = client.patch(
+        f"/faults/{created['ticket_id']}/status",
+        json={"status": "in_progress"},
+        headers={"X-Maintenance-Key": "test-maintenance-key"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "in_progress"
+
+    # Persisted, not just returned in-memory.
+    follow_up = client.get(f"/faults/{created['ticket_id']}")
+    assert follow_up.json()["status"] == "in_progress"
+
+
+def test_status_update_without_key_is_forbidden(client, monkeypatch):
+    monkeypatch.setenv("MAINTENANCE_API_KEY", "test-maintenance-key")
+    created = client.post("/faults", json=VALID_PAYLOAD).json()
+
+    resp = client.patch(f"/faults/{created['ticket_id']}/status", json={"status": "resolved"})
+    assert resp.status_code == 403
+    assert resp.json()["detail"]["error"] == "forbidden"
+
+    # Status must be unchanged.
+    follow_up = client.get(f"/faults/{created['ticket_id']}")
+    assert follow_up.json()["status"] == "open"
+
+
+def test_status_update_with_wrong_key_is_forbidden(client, monkeypatch):
+    monkeypatch.setenv("MAINTENANCE_API_KEY", "test-maintenance-key")
+    created = client.post("/faults", json=VALID_PAYLOAD).json()
+
+    resp = client.patch(
+        f"/faults/{created['ticket_id']}/status",
+        json={"status": "resolved"},
+        headers={"X-Maintenance-Key": "wrong-key"},
+    )
+    assert resp.status_code == 403
+
+
+def test_status_update_when_key_not_configured_is_forbidden(client, monkeypatch):
+    monkeypatch.delenv("MAINTENANCE_API_KEY", raising=False)
+    created = client.post("/faults", json=VALID_PAYLOAD).json()
+
+    # Even a request with some key attached must fail, since no key
+    # could ever be considered valid when none is configured.
+    resp = client.patch(
+        f"/faults/{created['ticket_id']}/status",
+        json={"status": "resolved"},
+        headers={"X-Maintenance-Key": "anything"},
+    )
+    assert resp.status_code == 403
+
+
+def test_status_update_unknown_ticket_returns_404(client, monkeypatch):
+    monkeypatch.setenv("MAINTENANCE_API_KEY", "test-maintenance-key")
+    resp = client.patch(
+        "/faults/FR-DOESNOTEXIST/status",
+        json={"status": "resolved"},
+        headers={"X-Maintenance-Key": "test-maintenance-key"},
+    )
+    assert resp.status_code == 404
+
+
+def test_status_update_invalid_status_value_rejected(client, monkeypatch):
+    monkeypatch.setenv("MAINTENANCE_API_KEY", "test-maintenance-key")
+    created = client.post("/faults", json=VALID_PAYLOAD).json()
+
+    resp = client.patch(
+        f"/faults/{created['ticket_id']}/status",
+        json={"status": "done"},
+        headers={"X-Maintenance-Key": "test-maintenance-key"},
+    )
+    # Caught by the same global malformed-request handler as every other
+    # body-validation error, so it comes back 400 in the app's own error
+    # shape, not FastAPI's default 422.
+    assert resp.status_code == 400
+    assert resp.json()["error"] == "invalid_request"

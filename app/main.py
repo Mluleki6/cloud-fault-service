@@ -2,30 +2,42 @@
 Fault Reporting Service -- FastAPI app.
 
 Endpoints:
-  GET  /               simple HTML form for submitting and looking up tickets
-  POST /faults         submit a fault report (use cases 1-6, 8)
-  GET  /faults/{id}    retrieve a ticket by ID (use case 7)
-  GET  /health         liveness check
+  GET   /                      simple HTML form for submitting and looking up tickets
+  POST  /faults                submit a fault report (use cases 1-6, 8)
+  GET   /faults/{id}           retrieve a ticket by ID (use case 7)
+  PATCH /faults/{id}/status    maintenance-only: move a ticket to a new status
+  GET   /health                liveness check
 
 Run locally:      uvicorn app.main:app --reload
 Run in Docker:    see docker-compose.yml
 Deploy to Cloud Run:  see scripts/deploy_gcp.sh
 """
+import hmac
 import os
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import ValidationError
 
 from app.logging_utils import log_event
 from app.notify import notify_maintenance, NotificationError
-from app.persistence import Base, SessionLocal, Ticket, engine, get_ticket, init_db, save_ticket
+from app.persistence import (
+    Base,
+    SessionLocal,
+    Ticket,
+    engine,
+    get_ticket,
+    init_db,
+    save_ticket,
+    update_ticket_status,
+)
 from app.processing import derive_priority, generate_ticket_id, now_utc
-from app.schemas import ErrorResponse, FaultReportIn, FaultReportOut
+from app.schemas import ErrorResponse, FaultReportIn, FaultReportOut, StatusUpdateIn
 
 
 @asynccontextmanager
@@ -76,6 +88,29 @@ def serve_form():
     # docs. Calls the same POST /faults and GET /faults/{id} endpoints
     # below, no separate backend path, no authentication, no new scope.
     return FileResponse(_STATIC_DIR / "index.html")
+
+
+def _to_out(ticket: Ticket, correlation_id: str) -> FaultReportOut:
+    return FaultReportOut(
+        ticket_id=ticket.ticket_id,
+        correlation_id=correlation_id,
+        equipment_id=ticket.equipment_id,
+        location=ticket.location,
+        description=ticket.description,
+        severity=ticket.severity,
+        priority=ticket.priority,
+        status=ticket.status,
+        reporter_id=ticket.reporter_id,
+        created_at=ticket.created_at,
+        notified=ticket.notified,
+    )
+
+
+def _maintenance_key_valid(provided: Optional[str]) -> bool:
+    configured = os.environ.get("MAINTENANCE_API_KEY")
+    if not configured or not provided:
+        return False
+    return hmac.compare_digest(provided, configured)
 
 
 @app.get("/health")
@@ -173,19 +208,7 @@ def submit_fault_report(payload: dict):
             ticket_id=ticket_id,
             priority=priority,
         )
-        return FaultReportOut(
-            ticket_id=ticket.ticket_id,
-            correlation_id=correlation_id,
-            equipment_id=ticket.equipment_id,
-            location=ticket.location,
-            description=ticket.description,
-            severity=ticket.severity,
-            priority=ticket.priority,
-            status=ticket.status,
-            reporter_id=ticket.reporter_id,
-            created_at=ticket.created_at,
-            notified=ticket.notified,
-        )
+        return _to_out(ticket, correlation_id)
     finally:
         session.close()
 
@@ -207,18 +230,58 @@ def retrieve_fault_report(ticket_id: str):
                 },
             )
         log_event("fault_report.retrieved", correlation_id, ticket_id=ticket_id)
-        return FaultReportOut(
-            ticket_id=ticket.ticket_id,
-            correlation_id=ticket.correlation_id,
-            equipment_id=ticket.equipment_id,
-            location=ticket.location,
-            description=ticket.description,
-            severity=ticket.severity,
-            priority=ticket.priority,
-            status=ticket.status,
-            reporter_id=ticket.reporter_id,
-            created_at=ticket.created_at,
-            notified=ticket.notified,
+        return _to_out(ticket, ticket.correlation_id)
+    finally:
+        session.close()
+
+
+@app.patch("/faults/{ticket_id}/status", response_model=FaultReportOut)
+def update_fault_status(
+    ticket_id: str,
+    payload: StatusUpdateIn,
+    x_maintenance_key: Optional[str] = Header(default=None),
+):
+    # Maintenance-only: moves a ticket between open, in_progress and
+    # resolved. Gated by a single shared secret (MAINTENANCE_API_KEY)
+    # rather than per-user accounts -- deliberately the smallest
+    # mechanism that still tells "the maintenance team" apart from a
+    # reporter, not a login system. If the key is not configured at
+    # all, every request is refused rather than silently left open.
+    correlation_id = str(uuid.uuid4())
+
+    if not _maintenance_key_valid(x_maintenance_key):
+        log_event("fault_report.status_update_forbidden", correlation_id, ticket_id=ticket_id)
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "forbidden",
+                "detail": "A valid maintenance key is required to update ticket status.",
+                "correlation_id": correlation_id,
+            },
         )
+
+    session = SessionLocal()
+    try:
+        ticket = get_ticket(session, ticket_id)
+        if ticket is None:
+            log_event("fault_report.not_found", correlation_id, ticket_id=ticket_id)
+            raise HTTPException(
+                status_code=404,
+                detail={
+                    "error": "not_found",
+                    "detail": f"No ticket found for id {ticket_id}",
+                    "correlation_id": correlation_id,
+                },
+            )
+        old_status = ticket.status
+        ticket = update_ticket_status(session, ticket, payload.status.value)
+        log_event(
+            "fault_report.status_updated",
+            correlation_id,
+            ticket_id=ticket_id,
+            old_status=old_status,
+            new_status=ticket.status,
+        )
+        return _to_out(ticket, correlation_id)
     finally:
         session.close()

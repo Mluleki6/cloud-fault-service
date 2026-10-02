@@ -361,3 +361,50 @@ takes priority over webhook rule, a missing-recipient configuration
 error, and the email HTTP-failure path, all mocked so the automated
 suite makes no real network calls, the real-network proof above was
 run manually against the live stack instead.
+
+## Maintenance status update evidence (2026-10-02)
+
+`PATCH /faults/{ticket_id}/status` added, see
+`architecture/decisions/0002-maintenance-status-updates.md`. Verified
+against the rebuilt live stack with `MAINTENANCE_API_KEY=test-live-key-123`:
+
+```
+Submitted ticket FR-3DC711A8.
+
+Without a key:
+PATCH .../status {"status":"in_progress"}
+-> 403 forbidden
+
+With the wrong key (X-Maintenance-Key: wrong):
+-> 403 forbidden
+
+With the correct key:
+-> 200, "status": "in_progress"
+log: fault_report.status_updated, old_status: open, new_status: in_progress
+
+Moved again to resolved with the correct key:
+-> 200, "status": "resolved"
+log: fault_report.status_updated, old_status: in_progress, new_status: resolved
+
+Confirmed persisted, not just returned in-memory, via a separate
+GET /faults/FR-3DC711A8 -> status: in_progress (checked mid-sequence)
+```
+
+Then reset the container with no `MAINTENANCE_API_KEY` configured at
+all and retried the same update, this time with a header value present
+(`X-Maintenance-Key: anything-at-all`):
+
+```
+PATCH .../status {"status":"resolved"}
+-> 403 forbidden
+```
+
+Confirms the fail-closed design: a request with *some* key attached
+still cannot succeed when no key is configured server-side, there is
+no accidental default-open state. 32/32 tests pass, including 6 new
+tests in `tests/test_api.py` covering the correct-key success path,
+missing key, wrong key, unconfigured key, an unknown ticket, and an
+invalid status value (confirmed to come back `400` in the app's own
+error shape via the same global malformed-request handler used
+everywhere else, not FastAPI's default `422`, verified by actually
+running the test before trusting the assumption).

@@ -30,6 +30,9 @@ services:
       DB_FORCE_FAILURE: "${DB_FORCE_FAILURE:-0}"
       NOTIFY_WEBHOOK_URL: "${NOTIFY_WEBHOOK_URL:-}"
       NOTIFY_WEBHOOK_FORMAT: "${NOTIFY_WEBHOOK_FORMAT:-generic}"
+      NOTIFY_EMAIL_API_KEY: "${NOTIFY_EMAIL_API_KEY:-}"
+      NOTIFY_EMAIL_TO: "${NOTIFY_EMAIL_TO:-}"
+      NOTIFY_EMAIL_FROM: "${NOTIFY_EMAIL_FROM:-onboarding@resend.dev}"
     depends_on:
       db:
         condition: service_healthy

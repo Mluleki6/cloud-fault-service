@@ -13,12 +13,77 @@ import pytest
 from app.notify import NotificationError, notify_maintenance
 
 
-def test_no_webhook_configured_stays_a_noop(monkeypatch):
+def test_no_channel_configured_stays_a_noop(monkeypatch):
     monkeypatch.delenv("NOTIFY_WEBHOOK_URL", raising=False)
+    monkeypatch.delenv("NOTIFY_EMAIL_API_KEY", raising=False)
     assert notify_maintenance("FR-1", "LAB-014", "P1") is True
 
 
+def test_email_success_sends_via_resend(monkeypatch):
+    monkeypatch.setenv("NOTIFY_EMAIL_API_KEY", "re_test_key")
+    monkeypatch.setenv("NOTIFY_EMAIL_TO", "maintenance@example.test")
+    monkeypatch.delenv("NOTIFY_WEBHOOK_URL", raising=False)
+
+    captured = {}
+
+    def fake_post(url, headers, json, timeout):
+        captured["url"] = url
+        captured["headers"] = headers
+        captured["json"] = json
+        return httpx.Response(200, request=httpx.Request("POST", url))
+
+    monkeypatch.setattr(httpx, "post", fake_post)
+
+    assert notify_maintenance("FR-5", "LAB-014", "P1") is True
+    assert captured["url"] == "https://api.resend.com/emails"
+    assert captured["headers"]["Authorization"] == "Bearer re_test_key"
+    assert captured["json"]["from"] == "onboarding@resend.dev"
+    assert captured["json"]["to"] == ["maintenance@example.test"]
+    assert "FR-5" in captured["json"]["subject"]
+    assert "LAB-014" in captured["json"]["text"]
+
+
+def test_email_takes_priority_over_webhook(monkeypatch):
+    monkeypatch.setenv("NOTIFY_EMAIL_API_KEY", "re_test_key")
+    monkeypatch.setenv("NOTIFY_EMAIL_TO", "maintenance@example.test")
+    monkeypatch.setenv("NOTIFY_WEBHOOK_URL", "https://example.test/webhook")
+
+    called_urls = []
+
+    def fake_post(url, timeout, **kwargs):
+        called_urls.append(url)
+        return httpx.Response(200, request=httpx.Request("POST", url))
+
+    monkeypatch.setattr(httpx, "post", fake_post)
+
+    notify_maintenance("FR-6", "LAB-014", "P1")
+    assert called_urls == ["https://api.resend.com/emails"]
+
+
+def test_email_missing_recipient_raises_notification_error(monkeypatch):
+    monkeypatch.setenv("NOTIFY_EMAIL_API_KEY", "re_test_key")
+    monkeypatch.delenv("NOTIFY_EMAIL_TO", raising=False)
+
+    with pytest.raises(NotificationError):
+        notify_maintenance("FR-7", "LAB-014", "P1")
+
+
+def test_email_http_error_raises_notification_error(monkeypatch):
+    monkeypatch.setenv("NOTIFY_EMAIL_API_KEY", "re_test_key")
+    monkeypatch.setenv("NOTIFY_EMAIL_TO", "maintenance@example.test")
+
+    def fake_post(url, headers, json, timeout):
+        request = httpx.Request("POST", url)
+        return httpx.Response(401, request=request)
+
+    monkeypatch.setattr(httpx, "post", fake_post)
+
+    with pytest.raises(NotificationError):
+        notify_maintenance("FR-8", "LAB-014", "P1")
+
+
 def test_webhook_success_posts_generic_payload(monkeypatch):
+    monkeypatch.delenv("NOTIFY_EMAIL_API_KEY", raising=False)
     monkeypatch.setenv("NOTIFY_WEBHOOK_URL", "https://example.test/webhook")
     monkeypatch.delenv("NOTIFY_WEBHOOK_FORMAT", raising=False)
 
@@ -43,6 +108,7 @@ def test_webhook_success_posts_generic_payload(monkeypatch):
 
 
 def test_webhook_discord_format_wraps_content(monkeypatch):
+    monkeypatch.delenv("NOTIFY_EMAIL_API_KEY", raising=False)
     monkeypatch.setenv("NOTIFY_WEBHOOK_URL", "https://example.test/discord")
     monkeypatch.setenv("NOTIFY_WEBHOOK_FORMAT", "discord")
 
@@ -59,6 +125,7 @@ def test_webhook_discord_format_wraps_content(monkeypatch):
 
 
 def test_webhook_http_error_raises_notification_error(monkeypatch):
+    monkeypatch.delenv("NOTIFY_EMAIL_API_KEY", raising=False)
     monkeypatch.setenv("NOTIFY_WEBHOOK_URL", "https://example.test/webhook")
 
     def fake_post(url, json, timeout):
@@ -71,6 +138,7 @@ def test_webhook_http_error_raises_notification_error(monkeypatch):
 
 
 def test_webhook_non_2xx_status_raises_notification_error(monkeypatch):
+    monkeypatch.delenv("NOTIFY_EMAIL_API_KEY", raising=False)
     monkeypatch.setenv("NOTIFY_WEBHOOK_URL", "https://example.test/webhook")
 
     def fake_post(url, json, timeout):

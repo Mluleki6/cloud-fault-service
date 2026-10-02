@@ -28,7 +28,7 @@ Client  ->  GET /faults/{ticket_id}  ->  retrieve persisted ticket
 | API / function | FastAPI app in `app/`, run via Uvicorn | Cloud Run / Cloud Run functions |
 | Relational state | Postgres container (`docker-compose.yml`) | Cloud SQL (Postgres) |
 | Logging | Structured JSON to stdout (`app/logging_utils.py`) | Cloud Logging (auto-ingests stdout JSON) |
-| Notification | `app/notify.py` -- real webhook if `NOTIFY_WEBHOOK_URL` is set, zero-dependency stub otherwise | n8n webhook, Discord/Slack webhook, or Resend/SendGrid API call |
+| Notification | `app/notify.py` -- real email via Resend if `NOTIFY_EMAIL_API_KEY` is set, a webhook if `NOTIFY_WEBHOOK_URL` is set instead, zero-dependency stub otherwise | Resend/SendGrid API call, or n8n/Discord/Slack webhook |
 | Secrets | `.env` (never committed) | Secret Manager / Cloud Run env vars |
 
 Local dev also defaults to SQLite (zero setup) when `DATABASE_URL` is
@@ -188,16 +188,25 @@ originally, then add your result to `evidence/milestone3_evidence.md`:
 
 ## Real notifications (optional)
 
-Set `NOTIFY_WEBHOOK_URL` (see `.env.example`) to have the notification
-step actually POST to a webhook instead of the zero-dependency stub.
-Any webhook receiver works -- the easiest zero-cost option is a
-Discord server webhook (Server Settings -> Integrations -> Webhooks ->
-New Webhook -> Copy URL), set alongside `NOTIFY_WEBHOOK_FORMAT=discord`.
-Leave `NOTIFY_WEBHOOK_URL` unset to keep the original stub behaviour.
+Two real channels, both optional, both off by default.
 
-A failure of the real webhook still degrades exactly like the stub's
-simulated failure did: the ticket is persisted, `notified` comes back
-`false`, and the reason is logged (`fault_report.notify_failed`) --
+**Real email**, the one that actually lands in the maintenance
+contact's inbox. Set `NOTIFY_EMAIL_API_KEY` and `NOTIFY_EMAIL_TO` (see
+`.env.example`). Get a free API key at [resend.com](https://resend.com),
+no domain verification needed if you leave `NOTIFY_EMAIL_FROM` at its
+default test sender address. This was verified end to end against the
+real Resend API, see `evidence/milestone3_evidence.md`.
+
+**A webhook**, used only if the email key above is not set. Any webhook
+receiver works, the easiest zero-cost option is a Discord server
+webhook (Server Settings -> Integrations -> Webhooks -> New Webhook ->
+Copy URL), set alongside `NOTIFY_WEBHOOK_FORMAT=discord`.
+
+Leave both unset to keep the original zero-dependency stub behaviour.
+
+A failure of either real channel still degrades exactly like the
+stub's simulated failure did: the ticket is persisted, `notified`
+comes back `false`, and the reason is logged (`fault_report.notify_failed`) --
 verified against a live endpoint returning both 2xx and 5xx responses.
 
 ## Known limitations (state these in the report, don't hide them)

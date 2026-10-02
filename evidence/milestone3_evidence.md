@@ -321,3 +321,40 @@ network failure rather than a simulated one. 22/22 tests pass, including
 successful webhook post, Discord payload formatting, and both failure
 modes (connection error and non-2xx response), all with the HTTP call
 mocked so the test suite makes no real network requests.
+
+## Real email channel evidence (2026-10-02)
+
+`app/notify.py` was extended further so `NOTIFY_EMAIL_API_KEY` sends a
+real email via the Resend API (`https://api.resend.com/emails`), ahead
+of the webhook path if both are configured. First attempt caught a
+real bug: `docker-compose.yml` was not passing the new
+`NOTIFY_EMAIL_API_KEY`/`NOTIFY_EMAIL_TO`/`NOTIFY_EMAIL_FROM` variables
+into the container at all, so the first test silently fell through to
+the no-op stub (response came back in 26 milliseconds, far too fast
+for a real HTTPS call). Fixed by adding the three variables to the
+app service's `environment:` block, the same class of bug as the
+force-failure flags caught earlier in the project.
+
+Once fixed, tested against the real, live Resend endpoint (not a mock
+or echo server) with a deliberately invalid API key, so the failure
+path could be proven without needing a paid account:
+
+```
+NOTIFY_EMAIL_API_KEY=re_fake_key_to_test_real_endpoint
+NOTIFY_EMAIL_TO=maintenance@example.test
+
+POST /faults -> 201, "notified": false  (ticket still persisted)
+Round trip: 1.3 seconds (confirms this genuinely left the container
+and reached api.resend.com, unlike the earlier 26ms false pass)
+log: fault_report.notify_failed, reason: "Email send failed: Client
+     error '401 Unauthorized' for url 'https://api.resend.com/emails'"
+```
+
+Reset to the default (no email or webhook configured) and reconfirmed
+the original zero-dependency stub still returns `notified: true` with
+no external call, exactly as before this change. 26/26 tests pass,
+including 5 new unit tests covering the email success path, the email
+takes priority over webhook rule, a missing-recipient configuration
+error, and the email HTTP-failure path, all mocked so the automated
+suite makes no real network calls, the real-network proof above was
+run manually against the live stack instead.

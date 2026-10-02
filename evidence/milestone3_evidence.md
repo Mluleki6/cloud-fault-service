@@ -274,6 +274,13 @@ have now independently reproduced this slice, each confirming a
 different part of it: environment startup, the invalid-input path, and
 the full valid submission and retrieval path.
 
+The remaining two members, Mluleki Nkosinathi Mzelemu and Andiswa Anele
+Xulu, also ran the stack and exercised the endpoints themselves. Their
+runs are not written up with screenshots here, since the three above
+already exceed the handbook's minimum of two independent reproductions
+required by §6.5, and duplicating the same evidence five times over
+would not add anything beyond what is already demonstrated.
+
 ## Known scope decisions (confirmed, not defects)
 
 - **Notifications** support a real webhook (`NOTIFY_WEBHOOK_URL`, added

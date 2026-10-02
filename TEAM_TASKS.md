@@ -93,13 +93,41 @@ does a fault report actually produce an email someone receives.
    did, whether the email arrived, how long it took, anything that was
    confusing. Describe the screenshot content in words (don't paste
    real email addresses or API keys into this file).
-9. Commit it:
 
+9. Now build something: there's a real gap in the automated tests.
+   `tests/test_notify.py` tests what happens when the email provider
+   returns an error (like a 401), but not what happens if the
+   connection just times out, a different kind of failure. Open
+   `tests/test_notify.py`, find the test called
+   `test_webhook_http_error_raises_notification_error` near the bottom
+   (it tests this exact scenario for the webhook path using
+   `httpx.ConnectTimeout`), and add this new test anywhere in the file,
+   matching the existing style:
+
+   ```python
+   def test_email_connection_timeout_raises_notification_error(monkeypatch):
+       monkeypatch.setenv("NOTIFY_EMAIL_API_KEY", "re_test_key")
+       monkeypatch.setenv("NOTIFY_EMAIL_TO", "maintenance@example.test")
+
+       def fake_post(url, headers, json, timeout):
+           raise httpx.ConnectTimeout("connection timed out")
+
+       monkeypatch.setattr(httpx, "post", fake_post)
+
+       with pytest.raises(NotificationError):
+           notify_maintenance("FR-9", "LAB-014", "P1")
    ```
-   git add evidence/milestone4_email_verification_mzameni.md
-   git commit -m "Verify real email notification with a live Resend account"
-   git push
-   ```
+
+   Run `pytest tests/test_notify.py -v` and confirm it passes along
+   with all the others (should say something like "10 passed").
+
+10. Commit both files together:
+
+    ```
+    git add evidence/milestone4_email_verification_mzameni.md tests/test_notify.py
+    git commit -m "Verify real email notification; add missing connection-timeout test"
+    git push
+    ```
 
 ---
 
@@ -124,13 +152,45 @@ does a fault report actually produce an email someone receives.
 8. Create `evidence/milestone4_status_update_verification_sandile.md`
    describing what you did and what happened (don't include your real
    key value in this file).
-9. Commit:
 
+9. Now build something: the docs claim that setting a ticket to the
+   same status twice is harmless (no error), but nothing actually
+   tests this. Open `tests/test_api.py`, scroll to the bottom where
+   the other status-update tests are (functions starting with
+   `test_status_update_`), and add this new one below them, matching
+   the existing style:
+
+   ```python
+   def test_status_update_same_status_twice_is_idempotent(client, monkeypatch):
+       monkeypatch.setenv("MAINTENANCE_API_KEY", "test-maintenance-key")
+       created = client.post("/faults", json=VALID_PAYLOAD).json()
+
+       first = client.patch(
+           f"/faults/{created['ticket_id']}/status",
+           json={"status": "in_progress"},
+           headers={"X-Maintenance-Key": "test-maintenance-key"},
+       )
+       second = client.patch(
+           f"/faults/{created['ticket_id']}/status",
+           json={"status": "in_progress"},
+           headers={"X-Maintenance-Key": "test-maintenance-key"},
+       )
+
+       assert first.status_code == 200
+       assert second.status_code == 200
+       assert second.json()["status"] == "in_progress"
    ```
-   git add evidence/milestone4_status_update_verification_sandile.md
-   git commit -m "Verify maintenance status update, success and refusal paths"
-   git push
-   ```
+
+   Run `pytest tests/test_api.py -v` and confirm it passes along with
+   all the others (should say something like "16 passed").
+
+10. Commit both files together:
+
+    ```
+    git add evidence/milestone4_status_update_verification_sandile.md tests/test_api.py
+    git commit -m "Verify maintenance status update; add missing idempotency test"
+    git push
+    ```
 
 ---
 
@@ -156,14 +216,32 @@ does a fault report actually produce an email someone receives.
 4. Read `architecture/decisions/0002-maintenance-status-updates.md`
    (the record of why the status-update feature was added). Note
    anything unclear or that you'd word differently.
-5. Create `evidence/milestone4_teardown_verification_andiswax.md`
-   describing: that you did the teardown/rebuild, that it worked, and
-   your notes on the ADR.
-6. Commit:
+
+5. Now build something: a proper Test Record, using the exact template
+   from the handbook (section 9.2), for the teardown/rebuild check you
+   just did. Create a new file `evidence/test_record_andiswax.md` with
+   this table filled in with your own real results (not copied from
+   anywhere, your own run):
+
+   ```markdown
+   # Test Record — Teardown and Rebuild Check
+
+   | Field | Entry |
+   |---|---|
+   | Test ID and requirement | TR-01, handbook section 7.1 teardown/rebuild check |
+   | Input/precondition | Project running via docker compose up |
+   | Expected result | docker compose down -v removes everything; docker compose up --build recreates a working service from nothing |
+   | Actual result | (fill in what actually happened for you) |
+   | Correlation/evidence reference | (paste a ticket_id or correlation_id from a report you submitted after rebuilding) |
+   | Pass/fail and defect link | (pass or fail, and if fail, describe what went wrong) |
+   | Retest result | (only fill in if you had to retry) |
+   ```
+
+6. Commit everything together:
 
    ```
-   git add evidence/milestone4_teardown_verification_andiswax.md
-   git commit -m "Verify teardown and rebuild, proofread status-update ADR"
+   git add evidence/milestone4_teardown_verification_andiswax.md evidence/test_record_andiswax.md
+   git commit -m "Verify teardown and rebuild, proofread status-update ADR, add formal test record"
    git push
    ```
 

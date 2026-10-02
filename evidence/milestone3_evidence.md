@@ -138,6 +138,66 @@ This proves the core resilience requirement: a downstream notification
 failure is logged and does not block or corrupt the primary transaction —
 the ticket is still created and retrievable, just with `notified: false`.
 
+## Second-member reproduction (handbook §6.5)
+
+**Reproduced by:** Mzameni Nkosi (Data & Observability Lead), via the
+zero-GitHub package (`HOW_TO_TEST_THIS.txt`) sent directly, independent
+of the primary development machine. Screenshots in
+[milestone3/second-member-mzameni/](milestone3/second-member-mzameni/).
+
+**What was submitted** (`04-post-faults-filled-body.png`):
+```json
+{
+  "equipment_id": "PC-001",
+  "location": "Computer Lab 1",
+  "description": "Computer is not powering on",
+  "severity": "high",
+  "reporter_id": "STU-001"
+}
+```
+
+**Resulting ticket, retrieved via a separate `GET /faults/{ticket_id}`
+request** (`03-get-ticket-200-response.png`):
+```json
+{
+  "ticket_id": "FR-8330B873",
+  "correlation_id": "4b5a7f31-6236-4605-9d89-4d3b9189c104",
+  "equipment_id": "PC-001",
+  "location": "Computer Lab 1",
+  "description": "Computer is not powering on",
+  "severity": "high",
+  "priority": "P1",
+  "status": "open",
+  "reporter_id": "STU-001",
+  "created_at": "2026-09-30T20:05:19.572444",
+  "notified": true
+}
+```
+HTTP 200, at `http://localhost:8080/faults/FR-8330B873`, response header
+`date: Wed, 30 Sep 2026 20:10:04 GMT` -- five minutes after the ticket's
+`created_at`, consistent with an independent session (submit, then come
+back and look it up), not a single scripted motion.
+
+**What this proves:**
+- The slice runs correctly on a second machine, from the README /
+  `HOW_TO_TEST_THIS.txt` instructions alone, with no live help from the
+  original developer -- satisfying §6.2's "create the environment from
+  repository instructions on a clean machine."
+- `severity: "high"` correctly derived `priority: "P1"` on an
+  independent run (**F3**), not just in the primary developer's tests.
+- A ticket persisted via `POST /faults` was retrieved via a *separate*
+  `GET /faults/{ticket_id}` request (**F4**), reproduced independently.
+- `reporter_id: "STU-001"` -- a synthetic ID, consistent with the
+  Milestone 1 ethical/privacy boundary.
+- `01-post-faults-form.png` and `02-response-schema-reference.png` show
+  the Swagger UI before submission and the documented response schema;
+  included for completeness even though they aren't live-call evidence.
+
+This is the second of the two reproductions required by §6.5's
+acceptance checklist ("at least two members have reproduced the
+slice") -- the first being the original developer's own runs captured
+throughout this document.
+
 ## Known scope decisions (confirmed, not defects)
 
 - **Notifications** support a real webhook (`NOTIFY_WEBHOOK_URL`, added

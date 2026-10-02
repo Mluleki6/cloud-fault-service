@@ -36,7 +36,7 @@ least one other member's area and must be able to explain the whole system.
 | 3 | Trace that ID through the logs | `docker compose logs app \| grep <correlation_id>` — show `accepted` → `notified`/`notify_failed` → `persisted` all sharing the ID | Data & observability lead | Same session |
 | 4 | Submit one invalid event, show it's rejected safely | Re-run smoke test's E4/E5 cases, confirm no new row in `tickets` table for those requests | Function/application developer | Same session |
 | 5 | Run one automated + one end-to-end test | `pytest -v` (automated) + `scripts/smoke_test.sh` (end-to-end) | QA, cost & documentation lead | Same session |
-| 6 | **Second team member independently reproduces the slice** (§6.5 acceptance: "at least two members have reproduced") | A different teammate repeats steps 1–5 on their own machine, from the README alone, no live help | Any second member | Before the clinic |
+| 6 | **Second team member independently reproduces the slice** (§6.5 acceptance: "at least two members have reproduced") | ✅ Done 2026-09-30 -- Mzameni Nkosi reproduced via the zero-GitHub package, submitted and retrieved a ticket independently. See `evidence/milestone3_evidence.md`, "Second-member reproduction" | Mzameni Nkosi | Done |
 | 7 | Record blockers / amendments | Log anything that broke or was unclear in `architecture/decisions/` as a new numbered ADR entry if it changes a prior decision | Architecture & integration lead | Ongoing |
 | 8 | Update README so it's reproducible by someone who wasn't in this conversation | Sanity-check `README.md`'s Docker instructions read correctly with zero implicit context | QA, cost & documentation lead | Before submission |
 

@@ -13,11 +13,12 @@ flowchart TB
     subgraph EXT["Outside the trust boundary"]
         Reporter(["Reporter\n(student / staff)"])
         MaintContact(["Maintenance contact"])
+        MaintTeam(["Maintenance team\n(shared key)"])
     end
 
     subgraph TB["Cloud project trust boundary"]
         direction TB
-        API["API endpoint\nFastAPI: POST /faults, GET /faults/{id}, GET /health"]
+        API["API endpoint\nFastAPI: POST /faults, GET /faults/{id}, PATCH /faults/{id}/status, GET /health"]
         Validate["Validation\nPydantic schema (app/schemas.py)"]
         Process["Processing\nseverity -> priority rule (app/processing.py)"]
         Persist[("Persistence\nPostgres / Cloud SQL\n(app/persistence.py)")]
@@ -41,6 +42,10 @@ flowchart TB
     API -- "retrieve" --> Persist
     Persist -- "found / not found" --> Log
     Persist --> Reporter
+           MaintTeam -- "PATCH /faults/{id}/status + key" --> API
+       API -- "key ok: status updated" --> Persist
+       API -- "wrong key or bad status: refused" --> Log
+       API -- "refused / updated" --> MaintTeam
 ```
 
 ## Annotations
@@ -60,6 +65,7 @@ table below):
 | Persistence | Durable system of record | Postgres locally / in Docker, Cloud SQL when deployed — same SQLAlchemy models, only `DATABASE_URL` changes. This is the system of record, not a disposable cache — satisfies the Milestone 1 architecture note that persistent state "is not hidden inside a replaceable function." |
 | Notification | Best-effort, explicitly non-blocking | A failure here is caught, logged, and does **not** fail the request or corrupt the persisted ticket — satisfies **Q3**'s "safe error, not corrupted state" for this dependency. |
 | Structured log | Cross-cutting, every path | Every accepted/rejected/failed event writes one JSON line carrying `correlation_id`, satisfying **Q4**. In Cloud Run this stream is auto-ingested by Cloud Logging with zero extra wiring. |
+| Maintenance team | Actor outside the trust boundary who updates ticket status | Uses a shared key in the `X-Maintenance-Key` header (not per-user login) to move a ticket open → in progress → resolved. |
 
 ## Full component annotation (§5.2 required chain)
 

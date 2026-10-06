@@ -203,7 +203,15 @@ def submit_fault_report(payload: dict):
 
         # --- Notification (recovery/degradation case lives here) ----------
         try:
-            notified = notify_maintenance(ticket_id, report.equipment_id, priority)
+            notified = notify_maintenance(
+                ticket_id,
+                report.equipment_id,
+                priority,
+                location=report.location,
+                description=report.description,
+                severity=report.severity.value,
+                reporter_id=report.reporter_id,
+            )
             ticket.notified = notified
             session.commit()
             log_event("fault_report.notified", correlation_id, ticket_id=ticket_id)

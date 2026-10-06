@@ -31,8 +31,33 @@ class NotificationError(Exception):
     pass
 
 
-def _build_payload(ticket_id: str, equipment_id: str, priority: str, fmt: str) -> dict:
-    message = f"New fault ticket {ticket_id} ({equipment_id}) - priority {priority}"
+def _ticket_url(ticket_id: str) -> str:
+    # APP_BASE_URL lets this link stay correct when deployed somewhere
+    # other than localhost (e.g. Cloud Run), without any code change,
+    # same pattern as every other environment-driven setting here.
+    base = os.environ.get("APP_BASE_URL", "http://localhost:8080").rstrip("/")
+    return f"{base}/?ticket_id={ticket_id}"
+
+
+def _build_payload(
+    ticket_id: str,
+    equipment_id: str,
+    priority: str,
+    fmt: str,
+    *,
+    location: str = "",
+    description: str = "",
+    severity: str = "",
+    reporter_id: str = "",
+) -> dict:
+    link = _ticket_url(ticket_id)
+    message = (
+        f"New fault ticket {ticket_id} ({equipment_id}) - priority {priority}\n"
+        f"Reported by: {reporter_id} at {location}\n"
+        f"Severity: {severity}\n"
+        f"Description: {description}\n"
+        f"View and update this ticket: {link}"
+    )
     if fmt == "discord":
         return {"content": message}
     if fmt == "slack":
@@ -41,24 +66,46 @@ def _build_payload(ticket_id: str, equipment_id: str, priority: str, fmt: str) -
         "ticket_id": ticket_id,
         "equipment_id": equipment_id,
         "priority": priority,
+        "location": location,
+        "description": description,
+        "severity": severity,
+        "reporter_id": reporter_id,
+        "ticket_url": link,
         "message": message,
     }
 
 
-def _send_email(ticket_id: str, equipment_id: str, priority: str) -> None:
+def _send_email(
+    ticket_id: str,
+    equipment_id: str,
+    priority: str,
+    *,
+    location: str = "",
+    description: str = "",
+    severity: str = "",
+    reporter_id: str = "",
+) -> None:
     api_key = os.environ["NOTIFY_EMAIL_API_KEY"]
     to_address = os.environ.get("NOTIFY_EMAIL_TO")
     if not to_address:
         raise NotificationError("NOTIFY_EMAIL_API_KEY is set but NOTIFY_EMAIL_TO is missing")
     from_address = os.environ.get("NOTIFY_EMAIL_FROM", "onboarding@resend.dev")
+    link = _ticket_url(ticket_id)
 
     subject = f"New fault ticket {ticket_id} (priority {priority})"
     body = (
         f"A new fault report has been logged.\n\n"
         f"Ticket ID: {ticket_id}\n"
         f"Equipment: {equipment_id}\n"
-        f"Priority: {priority}\n\n"
-        f"Look this ticket up at the Fault Reporting Service to see full details."
+        f"Priority: {priority}\n"
+        f"Severity: {severity}\n"
+        f"Location: {location}\n"
+        f"Description: {description}\n"
+        f"Reported by (synthetic reporter ID): {reporter_id}\n\n"
+        f"View this ticket, and update its status from the maintenance\n"
+        f"section on the same page (you will need the shared maintenance\n"
+        f"key, this link does not include it):\n"
+        f"{link}"
     )
     try:
         response = httpx.post(
@@ -72,10 +119,23 @@ def _send_email(ticket_id: str, equipment_id: str, priority: str) -> None:
         raise NotificationError(f"Email send failed: {exc}") from exc
 
 
-def _send_webhook(ticket_id: str, equipment_id: str, priority: str) -> None:
+def _send_webhook(
+    ticket_id: str,
+    equipment_id: str,
+    priority: str,
+    *,
+    location: str = "",
+    description: str = "",
+    severity: str = "",
+    reporter_id: str = "",
+) -> None:
     webhook_url = os.environ["NOTIFY_WEBHOOK_URL"]
     fmt = os.environ.get("NOTIFY_WEBHOOK_FORMAT", "generic")
-    payload = _build_payload(ticket_id, equipment_id, priority, fmt)
+    payload = _build_payload(
+        ticket_id, equipment_id, priority, fmt,
+        location=location, description=description,
+        severity=severity, reporter_id=reporter_id,
+    )
     try:
         response = httpx.post(webhook_url, json=payload, timeout=_TIMEOUT_SECONDS)
         response.raise_for_status()
@@ -83,16 +143,27 @@ def _send_webhook(ticket_id: str, equipment_id: str, priority: str) -> None:
         raise NotificationError(f"Webhook call failed: {exc}") from exc
 
 
-def notify_maintenance(ticket_id: str, equipment_id: str, priority: str) -> bool:
+def notify_maintenance(
+    ticket_id: str,
+    equipment_id: str,
+    priority: str,
+    *,
+    location: str = "",
+    description: str = "",
+    severity: str = "",
+    reporter_id: str = "",
+) -> bool:
     if os.environ.get("NOTIFY_FORCE_FAILURE") == "1":
         raise NotificationError("Simulated notification service outage")
 
+    kwargs = dict(location=location, description=description, severity=severity, reporter_id=reporter_id)
+
     if os.environ.get("NOTIFY_EMAIL_API_KEY"):
-        _send_email(ticket_id, equipment_id, priority)
+        _send_email(ticket_id, equipment_id, priority, **kwargs)
         return True
 
     if os.environ.get("NOTIFY_WEBHOOK_URL"):
-        _send_webhook(ticket_id, equipment_id, priority)
+        _send_webhook(ticket_id, equipment_id, priority, **kwargs)
         return True
 
     # No real channel configured -- keep the zero-dependency stub

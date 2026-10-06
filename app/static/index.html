@@ -219,10 +219,8 @@ document.getElementById("submitForm").addEventListener("submit", async (e) => {
   }
 });
 
-document.getElementById("lookupForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
+async function lookupTicket(id) {
   const resultEl = document.getElementById("lookupResult");
-  const id = document.getElementById("ticket_id").value.trim();
   setPlain(resultEl, "Looking up...");
 
   try {
@@ -240,7 +238,26 @@ document.getElementById("lookupForm").addEventListener("submit", async (e) => {
     setPlain(resultEl, "Could not reach the service. Check your connection and try again.");
     resultEl.className = "result err";
   }
+}
+
+document.getElementById("lookupForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  lookupTicket(document.getElementById("ticket_id").value.trim());
 });
+
+// A notification email links here as /?ticket_id=FR-XXXX. Pre-fill the
+// lookup and maintenance-status boxes and look it up automatically, so
+// following that link actually saves the maintenance team a step
+// instead of landing on a blank form they still have to fill in.
+(function prefillFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const ticketId = params.get("ticket_id");
+  if (!ticketId) return;
+  document.getElementById("ticket_id").value = ticketId;
+  document.getElementById("status_ticket_id").value = ticketId;
+  lookupTicket(ticketId);
+  document.getElementById("lookupResult").scrollIntoView({ behavior: "smooth", block: "center" });
+})();
 
 document.getElementById("statusForm").addEventListener("submit", async (e) => {
   e.preventDefault();

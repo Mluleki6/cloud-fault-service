@@ -97,13 +97,28 @@ def test_webhook_success_posts_generic_payload(monkeypatch):
 
     monkeypatch.setattr(httpx, "post", fake_post)
 
-    assert notify_maintenance("FR-1", "LAB-014", "P1") is True
+    assert notify_maintenance(
+        "FR-1", "LAB-014", "P1",
+        location="Room 214", description="Projector down.",
+        severity="high", reporter_id="STU-001",
+    ) is True
     assert captured["url"] == "https://example.test/webhook"
     assert captured["json"] == {
         "ticket_id": "FR-1",
         "equipment_id": "LAB-014",
         "priority": "P1",
-        "message": "New fault ticket FR-1 (LAB-014) - priority P1",
+        "location": "Room 214",
+        "description": "Projector down.",
+        "severity": "high",
+        "reporter_id": "STU-001",
+        "ticket_url": "http://localhost:8080/?ticket_id=FR-1",
+        "message": (
+            "New fault ticket FR-1 (LAB-014) - priority P1\n"
+            "Reported by: STU-001 at Room 214\n"
+            "Severity: high\n"
+            "Description: Projector down.\n"
+            "View and update this ticket: http://localhost:8080/?ticket_id=FR-1"
+        ),
     }
 
 
@@ -120,8 +135,18 @@ def test_webhook_discord_format_wraps_content(monkeypatch):
 
     monkeypatch.setattr(httpx, "post", fake_post)
 
-    notify_maintenance("FR-2", "AC-203", "P3")
-    assert captured["json"] == {"content": "New fault ticket FR-2 (AC-203) - priority P3"}
+    notify_maintenance(
+        "FR-2", "AC-203", "P3",
+        location="Room 2", description="Noisy aircon.",
+        severity="low", reporter_id="STU-002",
+    )
+    assert captured["json"] == {"content": (
+        "New fault ticket FR-2 (AC-203) - priority P3\n"
+        "Reported by: STU-002 at Room 2\n"
+        "Severity: low\n"
+        "Description: Noisy aircon.\n"
+        "View and update this ticket: http://localhost:8080/?ticket_id=FR-2"
+    )}
 
 
 def test_webhook_http_error_raises_notification_error(monkeypatch):

@@ -23,6 +23,7 @@ from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import ValidationError
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.logging_utils import log_event
 from app.notify import notify_maintenance, NotificationError
@@ -106,6 +107,25 @@ def _to_out(ticket: Ticket, correlation_id: str) -> FaultReportOut:
     )
 
 
+def _raise_db_unavailable(correlation_id: str, ticket_id: Optional[str] = None) -> None:
+    # Covers a *real* database outage (connection refused, server
+    # closed the connection, etc.), not just the DB_FORCE_FAILURE
+    # simulation flag below. Without this, a genuine outage was
+    # bubbling up as an unhandled sqlalchemy.exc.OperationalError and
+    # a raw 500, which is exactly the "crash" Q3 says the system must
+    # not do -- found by actually stopping the db container and
+    # watching it happen, not assumed safe from the simulated test.
+    log_event("fault_report.db_unavailable", correlation_id, ticket_id=ticket_id)
+    raise HTTPException(
+        status_code=503,
+        detail={
+            "error": "dependency_unavailable",
+            "detail": "The datastore is currently unavailable. Please retry shortly.",
+            "correlation_id": correlation_id,
+        },
+    )
+
+
 def _maintenance_key_valid(provided: Optional[str]) -> bool:
     configured = os.environ.get("MAINTENANCE_API_KEY")
     if not configured or not provided:
@@ -158,15 +178,7 @@ def submit_fault_report(payload: dict):
 
     # --- Persistence (dependency-failure case lives here) -----------------
     if os.environ.get("DB_FORCE_FAILURE") == "1":
-        log_event("fault_report.db_unavailable", correlation_id, ticket_id=ticket_id)
-        raise HTTPException(
-            status_code=503,
-            detail={
-                "error": "dependency_unavailable",
-                "detail": "The datastore is currently unavailable. Please retry shortly.",
-                "correlation_id": correlation_id,
-            },
-        )
+        _raise_db_unavailable(correlation_id, ticket_id=ticket_id)
 
     session = SessionLocal()
     try:
@@ -183,7 +195,11 @@ def submit_fault_report(payload: dict):
             created_at=created_at,
             notified=False,
         )
-        ticket = save_ticket(session, ticket)
+        try:
+            ticket = save_ticket(session, ticket)
+        except SQLAlchemyError:
+            session.rollback()
+            _raise_db_unavailable(correlation_id, ticket_id=ticket_id)
 
         # --- Notification (recovery/degradation case lives here) ----------
         try:
@@ -218,7 +234,10 @@ def retrieve_fault_report(ticket_id: str):
     correlation_id = str(uuid.uuid4())
     session = SessionLocal()
     try:
-        ticket = get_ticket(session, ticket_id)
+        try:
+            ticket = get_ticket(session, ticket_id)
+        except SQLAlchemyError:
+            _raise_db_unavailable(correlation_id, ticket_id=ticket_id)
         if ticket is None:
             log_event("fault_report.not_found", correlation_id, ticket_id=ticket_id)
             raise HTTPException(
@@ -262,7 +281,10 @@ def update_fault_status(
 
     session = SessionLocal()
     try:
-        ticket = get_ticket(session, ticket_id)
+        try:
+            ticket = get_ticket(session, ticket_id)
+        except SQLAlchemyError:
+            _raise_db_unavailable(correlation_id, ticket_id=ticket_id)
         if ticket is None:
             log_event("fault_report.not_found", correlation_id, ticket_id=ticket_id)
             raise HTTPException(
@@ -274,7 +296,11 @@ def update_fault_status(
                 },
             )
         old_status = ticket.status
-        ticket = update_ticket_status(session, ticket, payload.status.value)
+        try:
+            ticket = update_ticket_status(session, ticket, payload.status.value)
+        except SQLAlchemyError:
+            session.rollback()
+            _raise_db_unavailable(correlation_id, ticket_id=ticket_id)
         log_event(
             "fault_report.status_updated",
             correlation_id,

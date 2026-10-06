@@ -149,3 +149,21 @@ def test_webhook_non_2xx_status_raises_notification_error(monkeypatch):
 
     with pytest.raises(NotificationError):
         notify_maintenance("FR-4", "LAB-014", "P1")
+
+
+def test_email_connection_timeout_raises_notification_error(monkeypatch):
+    # Mirrors test_webhook_http_error_raises_notification_error above,
+    # but for the email path: a connection timeout is a different kind
+    # of failure than an HTTP error status (e.g. the 401 covered by
+    # test_email_http_error_raises_notification_error) and wasn't
+    # covered until now.
+    monkeypatch.setenv("NOTIFY_EMAIL_API_KEY", "re_test_key")
+    monkeypatch.setenv("NOTIFY_EMAIL_TO", "maintenance@example.test")
+
+    def fake_post(url, headers, json, timeout):
+        raise httpx.ConnectTimeout("connection timed out")
+
+    monkeypatch.setattr(httpx, "post", fake_post)
+
+    with pytest.raises(NotificationError):
+        notify_maintenance("FR-9", "LAB-014", "P1")

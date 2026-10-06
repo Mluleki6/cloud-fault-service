@@ -183,3 +183,26 @@ def test_status_update_invalid_status_value_rejected(client, monkeypatch):
     # shape, not FastAPI's default 422.
     assert resp.status_code == 400
     assert resp.json()["error"] == "invalid_request"
+
+
+def test_status_update_same_status_twice_is_idempotent(client, monkeypatch):
+    # interface-contracts.md documents this as idempotent ("no error on
+    # a no-op transition"), but nothing actually tested that claim
+    # until now.
+    monkeypatch.setenv("MAINTENANCE_API_KEY", "test-maintenance-key")
+    created = client.post("/faults", json=VALID_PAYLOAD).json()
+
+    first = client.patch(
+        f"/faults/{created['ticket_id']}/status",
+        json={"status": "in_progress"},
+        headers={"X-Maintenance-Key": "test-maintenance-key"},
+    )
+    second = client.patch(
+        f"/faults/{created['ticket_id']}/status",
+        json={"status": "in_progress"},
+        headers={"X-Maintenance-Key": "test-maintenance-key"},
+    )
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert second.json()["status"] == "in_progress"

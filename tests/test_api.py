@@ -182,7 +182,29 @@ def test_status_update_invalid_status_value_rejected(client, monkeypatch):
     # body-validation error, so it comes back 400 in the app's own error
     # shape, not FastAPI's default 422.
     assert resp.status_code == 400
-    assert resp.json()["error"] == "invalid_request"
+    body = resp.json()
+    assert body["error"] == "invalid_request"
+    # Regression test for a real defect (found by Andiswa Xulu): the
+    # body here is perfectly well-formed JSON, the problem is the enum
+    # value, so the top-level detail must not claim a JSON parsing
+    # failure, that message is reserved for genuinely malformed JSON
+    # (see test_malformed_json_body_keeps_its_own_detail_message below).
+    assert body["detail"] == "One or more fields failed validation."
+    assert body["errors"][0]["loc"] == ["body", "status"]
+
+
+def test_malformed_json_body_keeps_its_own_detail_message(client):
+    # The other branch of the same handler: this body genuinely isn't
+    # valid JSON, so the "is not valid JSON" detail is correct here,
+    # unlike the enum case above.
+    resp = client.post(
+        "/faults",
+        data="{not valid json",
+        headers={"Content-Type": "application/json"},
+    )
+    assert resp.status_code == 400
+    body = resp.json()
+    assert body["detail"] == "The request body is missing or is not valid JSON."
 
 
 def test_status_update_same_status_twice_is_idempotent(client, monkeypatch):

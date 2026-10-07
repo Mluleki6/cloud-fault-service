@@ -52,17 +52,35 @@ app = FastAPI(title="Fault Reporting Service", version="0.1.0", lifespan=lifespa
 
 @app.exception_handler(RequestValidationError)
 async def malformed_request_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
-    # Catches bodies that fail before FaultReportIn validation even runs --
-    # not valid JSON, or valid JSON that isn't an object (e.g. a bare
-    # string or array). Without this, FastAPI's default handler returns a
-    # differently-shaped error with no correlation_id, breaking the same
-    # error contract documented in architecture/event-contract.json and
-    # skipping the structured log Q4 requires for every rejected event.
+    # Catches body-validation failures that happen before the handler's
+    # own try/except runs: not valid JSON, valid JSON that isn't an
+    # object, or (since the status-update endpoint was added) a
+    # well-formed body with a field value FastAPI's own typed
+    # parameter rejects, e.g. an invalid status enum on PATCH
+    # .../status. Without this, FastAPI's default handler returns a
+    # differently-shaped error with no correlation_id, breaking the
+    # same error contract documented in architecture/event-contract.json
+    # and skipping the structured log Q4 requires for every rejected
+    # event.
+    #
+    # The detail message used to unconditionally say "is not valid
+    # JSON", which was only ever true for the first case. Found by
+    # Andiswa Xulu testing an invalid status value: the JSON was
+    # perfectly well-formed, the real problem was an enum mismatch, but
+    # the top-level detail claimed a JSON parsing failure while the
+    # errors array correctly named the real one. Distinguish the two
+    # instead of guessing.
     correlation_id = str(uuid.uuid4())
     safe_errors = [
         {"loc": list(e.get("loc", [])), "msg": e.get("msg"), "type": e.get("type")}
         for e in exc.errors()
     ]
+    is_json_parse_failure = any(e.get("type") == "json_invalid" for e in safe_errors)
+    detail = (
+        "The request body is missing or is not valid JSON."
+        if is_json_parse_failure
+        else "One or more fields failed validation."
+    )
     log_event(
         "fault_report.rejected",
         correlation_id,
@@ -73,7 +91,7 @@ async def malformed_request_handler(request: Request, exc: RequestValidationErro
         status_code=400,
         content={
             "error": "invalid_request",
-            "detail": "The request body is missing or is not valid JSON.",
+            "detail": detail,
             "correlation_id": correlation_id,
             "errors": safe_errors,
         },

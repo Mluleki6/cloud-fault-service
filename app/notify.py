@@ -35,8 +35,10 @@ def _ticket_url(ticket_id: str) -> str:
     # APP_BASE_URL lets this link stay correct when deployed somewhere
     # other than localhost (e.g. Cloud Run), without any code change,
     # same pattern as every other environment-driven setting here.
+    # Points at /ticket, the maintenance dashboard, not /, the reporter's
+    # submission form -- the two are separate pages (see app/main.py).
     base = os.environ.get("APP_BASE_URL", "http://localhost:8080").rstrip("/")
-    return f"{base}/?ticket_id={ticket_id}"
+    return f"{base}/ticket?ticket_id={ticket_id}"
 
 
 def _build_payload(
@@ -102,9 +104,9 @@ def _send_email(
         f"Location: {location}\n"
         f"Description: {description}\n"
         f"Reported by (synthetic reporter ID): {reporter_id}\n\n"
-        f"View this ticket, and update its status from the maintenance\n"
-        f"section on the same page (you will need the shared maintenance\n"
-        f"key, this link does not include it):\n"
+        f"View this ticket, and update its status, on its own dashboard\n"
+        f"page (you will need the shared maintenance key, this link does\n"
+        f"not include it):\n"
         f"{link}"
     )
     try:

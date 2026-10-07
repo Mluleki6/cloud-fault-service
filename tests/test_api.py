@@ -101,6 +101,27 @@ def test_notification_failure_degrades_gracefully(client, monkeypatch):
     assert follow_up.json()["notified"] is False
 
 
+# --- Static pages -------------------------------------------------------------
+
+def test_reporter_form_served_at_root(client):
+    resp = client.get("/")
+    assert resp.status_code == 200
+    assert "text/html" in resp.headers["content-type"]
+    assert "Report a fault" in resp.text
+    # The maintenance status-update control lives on its own page now,
+    # not mixed into the reporter's form.
+    assert "update a ticket's status" not in resp.text.lower()
+
+
+def test_ticket_dashboard_served_separately(client):
+    resp = client.get("/ticket")
+    assert resp.status_code == 200
+    assert "text/html" in resp.headers["content-type"]
+    assert "Update status" in resp.text
+    # The reporter's submission form lives on its own page, not here.
+    assert "Report a fault" not in resp.text
+
+
 # --- Maintenance status updates ------------------------------------------------
 
 def test_status_update_with_correct_key_succeeds(client, monkeypatch):

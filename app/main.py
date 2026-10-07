@@ -109,6 +109,16 @@ def serve_form():
     return FileResponse(_STATIC_DIR / "index.html")
 
 
+@app.get("/ticket", include_in_schema=False)
+def serve_ticket_page():
+    # A separate maintenance-facing page, distinct from the reporter's
+    # form above: ticket lookup plus the status-update control. The
+    # notification email links here (see app/notify.py, _ticket_url()),
+    # so opening a ticket from an email lands on a focused dashboard
+    # instead of the reporter's submission form.
+    return FileResponse(_STATIC_DIR / "ticket.html")
+
+
 def _to_out(ticket: Ticket, correlation_id: str) -> FaultReportOut:
     return FaultReportOut(
         ticket_id=ticket.ticket_id,

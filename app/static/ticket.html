@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Report a Fault</title>
+<title>Ticket — Fault Reporting Service</title>
 <style>
   :root { color-scheme: light; }
   body {
@@ -25,7 +25,7 @@
   }
   h2 { font-size: 1.1rem; margin-top: 0; }
   label { display: block; margin-top: 0.75rem; font-weight: 600; font-size: 0.9rem; }
-  input, select, textarea {
+  input, select {
     width: 100%;
     padding: 0.5rem;
     margin-top: 0.25rem;
@@ -34,7 +34,6 @@
     font-size: 1rem;
     box-sizing: border-box;
   }
-  textarea { resize: vertical; min-height: 4rem; }
   button {
     margin-top: 1rem;
     padding: 0.6rem 1.2rem;
@@ -64,44 +63,17 @@
   .result li { padding: 0.1rem 0; }
   .hint { color: #777; font-size: 0.8rem; margin-top: 0.25rem; }
   footer { text-align: center; color: #999; font-size: 0.8rem; margin-top: 2rem; }
+  a.back { color: #2563eb; text-decoration: none; font-size: 0.85rem; }
+  a.back:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
 
-<h1>Fault Reporting Service</h1>
-<p class="subtitle">University of Zululand, report a problem with equipment or a facility.</p>
+<h1>Ticket Dashboard</h1>
+<p class="subtitle">Maintenance view for a single fault report. Not the reporter form -- <a class="back" href="/">that's over here</a>.</p>
 
 <section>
-  <h2>Report a fault</h2>
-  <form id="submitForm">
-    <label for="equipment_id">Equipment ID</label>
-    <input id="equipment_id" required minlength="3" maxlength="32" placeholder="e.g. LAB-014">
-    <div class="hint">Letters, digits and hyphens only, 3 to 32 characters.</div>
-
-    <label for="location">Location</label>
-    <input id="location" required minlength="2" maxlength="120" placeholder="e.g. Science Building, Room 214">
-
-    <label for="description">What is wrong</label>
-    <textarea id="description" required minlength="5" maxlength="500" placeholder="e.g. Projector will not power on."></textarea>
-
-    <label for="severity">Severity</label>
-    <select id="severity">
-      <option value="low">Low</option>
-      <option value="medium" selected>Medium</option>
-      <option value="high">High</option>
-    </select>
-
-    <label for="reporter_id">Your reporter ID</label>
-    <input id="reporter_id" required minlength="3" maxlength="32" placeholder="e.g. STU-2026-001">
-    <div class="hint">Use a synthetic ID for testing, not a real student number.</div>
-
-    <button type="submit">Submit report</button>
-  </form>
-  <div id="submitResult"></div>
-</section>
-
-<section>
-  <h2>Look up a ticket</h2>
+  <h2>Ticket details</h2>
   <form id="lookupForm">
     <label for="ticket_id">Ticket ID</label>
     <input id="ticket_id" required placeholder="e.g. FR-9F3A21B0">
@@ -110,7 +82,27 @@
   <div id="lookupResult"></div>
 </section>
 
-<p class="hint" style="text-align:center;">On the maintenance team? <a href="/ticket">Open the ticket dashboard</a> to look up a ticket and update its status.</p>
+<section>
+  <h2>Update status</h2>
+  <p class="hint" style="margin-top:0;">Requires the shared maintenance key. Leave the key blank if you are not on the maintenance team.</p>
+  <form id="statusForm">
+    <label for="status_ticket_id">Ticket ID</label>
+    <input id="status_ticket_id" required placeholder="e.g. FR-9F3A21B0">
+
+    <label for="new_status">New status</label>
+    <select id="new_status">
+      <option value="open">Open</option>
+      <option value="in_progress" selected>In progress</option>
+      <option value="resolved">Resolved</option>
+    </select>
+
+    <label for="maintenance_key">Maintenance key</label>
+    <input id="maintenance_key" type="password" placeholder="Shared key, not your personal password">
+
+    <button type="submit">Update status</button>
+  </form>
+  <div id="statusResult"></div>
+</section>
 
 <footer>4CPS501B Cloud Computing Systems, Group 2. API docs at <a href="/docs">/docs</a>.</footer>
 
@@ -167,38 +159,6 @@ function showRejected(el, heading, detail) {
   el.innerHTML = '<div class="heading">' + heading + "</div>" + body;
 }
 
-document.getElementById("submitForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const resultEl = document.getElementById("submitResult");
-  setPlain(resultEl, "Submitting...");
-
-  const body = {
-    equipment_id: document.getElementById("equipment_id").value.trim(),
-    location: document.getElementById("location").value.trim(),
-    description: document.getElementById("description").value.trim(),
-    severity: document.getElementById("severity").value,
-    reporter_id: document.getElementById("reporter_id").value.trim(),
-  };
-
-  try {
-    const res = await fetch("/faults", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json();
-    if (res.ok) {
-      showTicket(resultEl, "Report submitted", data);
-      document.getElementById("ticket_id").value = data.ticket_id;
-    } else {
-      showRejected(resultEl, "We could not submit this report", data.detail || data);
-    }
-  } catch (err) {
-    setPlain(resultEl, "Could not reach the service. Check your connection and try again.");
-    resultEl.className = "result err";
-  }
-});
-
 async function lookupTicket(id) {
   const resultEl = document.getElementById("lookupResult");
   setPlain(resultEl, "Looking up...");
@@ -225,6 +185,43 @@ document.getElementById("lookupForm").addEventListener("submit", (e) => {
   lookupTicket(document.getElementById("ticket_id").value.trim());
 });
 
+// A notification email links here as /ticket?ticket_id=FR-XXXX. Pre-fill
+// both boxes and look it up automatically, so following that link saves
+// the maintenance team a step instead of landing on a blank form.
+(function prefillFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const ticketId = params.get("ticket_id");
+  if (!ticketId) return;
+  document.getElementById("ticket_id").value = ticketId;
+  document.getElementById("status_ticket_id").value = ticketId;
+  lookupTicket(ticketId);
+})();
+
+document.getElementById("statusForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const resultEl = document.getElementById("statusResult");
+  const id = document.getElementById("status_ticket_id").value.trim();
+  const status = document.getElementById("new_status").value;
+  const key = document.getElementById("maintenance_key").value;
+  setPlain(resultEl, "Updating...");
+
+  try {
+    const res = await fetch("/faults/" + encodeURIComponent(id) + "/status", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "X-Maintenance-Key": key },
+      body: JSON.stringify({ status }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      showTicket(resultEl, "Status updated", data);
+    } else {
+      showRejected(resultEl, "We could not update this ticket", data.detail || data);
+    }
+  } catch (err) {
+    setPlain(resultEl, "Could not reach the service. Check your connection and try again.");
+    resultEl.className = "result err";
+  }
+});
 </script>
 </body>
 </html>

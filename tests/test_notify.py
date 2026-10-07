@@ -111,13 +111,13 @@ def test_webhook_success_posts_generic_payload(monkeypatch):
         "description": "Projector down.",
         "severity": "high",
         "reporter_id": "STU-001",
-        "ticket_url": "http://localhost:8080/?ticket_id=FR-1",
+        "ticket_url": "http://localhost:8080/ticket?ticket_id=FR-1",
         "message": (
             "New fault ticket FR-1 (LAB-014) - priority P1\n"
             "Reported by: STU-001 at Room 214\n"
             "Severity: high\n"
             "Description: Projector down.\n"
-            "View and update this ticket: http://localhost:8080/?ticket_id=FR-1"
+            "View and update this ticket: http://localhost:8080/ticket?ticket_id=FR-1"
         ),
     }
 
@@ -145,7 +145,7 @@ def test_webhook_discord_format_wraps_content(monkeypatch):
         "Reported by: STU-002 at Room 2\n"
         "Severity: low\n"
         "Description: Noisy aircon.\n"
-        "View and update this ticket: http://localhost:8080/?ticket_id=FR-2"
+        "View and update this ticket: http://localhost:8080/ticket?ticket_id=FR-2"
     )}
 
 

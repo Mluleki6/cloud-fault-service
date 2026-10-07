@@ -1,4 +1,4 @@
-# Milestone 4 UI/Dashboard Validation -- Mzameni Nkosi
+# Milestone 4 UI/Dashboard Validation -- Andiswa Xulu
 
 Date: 07 October 2026
 

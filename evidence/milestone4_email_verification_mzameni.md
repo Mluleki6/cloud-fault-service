@@ -51,3 +51,15 @@ The page automatically displayed the ticket information without requiring me to 
 I verified that the email did not contain the maintenance key. The email explicitly stated that the maintenance key was not included.
 
 This test confirmed that the richer email content and ticket link function correctly.
+
+## Screenshots (second test)
+
+Saved to `evidence/milestone4/email-verification-mzameni/`:
+
+- `01-ticket-lookup-via-link.png` -- the app's ticket lookup page, loaded
+  via the `?ticket_id=FR-411227FE` link, showing the ticket auto-filled
+  with no manual entry.
+- `02-gmail-notification-received.png` -- the actual Gmail inbox
+  showing the email from `onboarding@resend.dev`, subject "New fault
+  ticket FR-411227FE (priority P2)", with the full ticket detail and
+  the ticket link, received 3:13 PM, 7 October 2026.

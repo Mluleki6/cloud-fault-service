@@ -1,4 +1,3 @@
-
 # Milestone 4 Email Verification - Mzameni Nkosi
 
 ## Objective
@@ -24,3 +23,31 @@ The configuration process was straightforward once the API key and email address
 
 ## Screenshot Description
 A fault report was submitted through the Cloud Fault Service web interface. A notification email was then received in the configured inbox confirming that the fault report had been created.
+
+## Second Email Verification Test
+
+Date: 07 October 2026
+
+I submitted another fault report and received a notification email.
+
+Ticket ID: FR-411227FE
+
+Correlation ID: 24475b4f-f647-4965-9a4d-49ed46c6ccd9
+
+The email contained:
+- Equipment: LAB-014
+- Priority: P2
+- Severity: medium
+- Location: Computer Lab
+- Description: output
+- Reporter ID: stu.202019760
+
+I clicked the ticket link in the email:
+
+http://localhost:8080/?ticket_id=FR-411227FE
+
+The page automatically displayed the ticket information without requiring me to type the ticket ID.
+
+I verified that the email did not contain the maintenance key. The email explicitly stated that the maintenance key was not included.
+
+This test confirmed that the richer email content and ticket link function correctly.
